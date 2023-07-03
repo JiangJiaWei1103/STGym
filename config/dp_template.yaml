@@ -1,0 +1,32 @@
+# Configuration for data processing
+# ==Data Processing==
+dp:
+    # Holdout (fixed)
+    holdout_ratio: 0.2
+
+    # Scaling
+    scaling: max
+
+    # Priori graph structure
+    priori_gs:
+        type: null
+        k: null
+
+# ==CV Scheme==
+cv:
+    scheme: tssplit
+    n_folds: 1
+    train_ratio: 0.75
+    val_ratio: 0.25
+
+# ==Dataset==
+dataset:
+    name: electricity
+    t_window: 168
+    horizon: 3
+
+    # Number of time slots in one day
+    n_tids: null
+
+    # If True, add "Day in week" identifier as the auxiliary feature
+    add_diw: False
