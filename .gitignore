@@ -1,0 +1,43 @@
+# Cache
+__pycache__
+.ipynb_checkpoints/
+wandb/
+*.swp
+.mypy_cache
+artifacts/
+
+# Script (Interface)
+tools/quick*
+
+# Dev
+notebooks/
+
+# Legacy code
+legacy/
+
+# Local cfg
+config/dp.yaml
+config/dp_debug.yaml
+config/dp_tmp.yaml
+config/defaults.yaml
+config/defaults_debug.yaml
+config/defaults_tmp.yaml
+config/model/*
+!config/model/*template.yaml
+
+# Data
+data/raw/*
+data/processed/*
+data/trafos/*
+data/download/*
+
+# Local output buffer
+output/
+
+# Submission
+submission.csv
+submissions/
+
+# Local misc
+notes.txt
+token.txt
