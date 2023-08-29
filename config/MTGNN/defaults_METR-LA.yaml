@@ -1,6 +1,6 @@
 # Common configuration for training and evaluation processes
 # ==Training==
-seed: 88
+seed: 168
 device: 'cuda:0'
 epochs: 100
 loss_fn:

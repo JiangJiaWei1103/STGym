@@ -45,7 +45,7 @@ def setup_dp(
     Return:
         dp_cfg: hyperparameters of data processor
     """
-    cfg_file = f"dp_{model_name}_{dataset_name}.yaml" if not debug else "dp_debug.yaml"
+    cfg_file = f"{model_name}/dp_{dataset_name}.yaml" if not debug else "dp_debug.yaml"
     cfg_path = os.path.join(CONFIG_PATH, cfg_file)
     with open(cfg_path, "r") as f:
         dp_cfg = yaml.full_load(f)
@@ -53,7 +53,7 @@ def setup_dp(
     return dp_cfg
 
 
-def setup_model(model_name: str) -> Dict[str, Any]:
+def setup_model(model_name: str, dataset_name: str) -> Dict[str, Any]:
     """Return hyperparameters of the specified model.
 
     Parameters:
@@ -62,7 +62,7 @@ def setup_model(model_name: str) -> Dict[str, Any]:
     Return:
         model_cfg: hyperparameters of the specified model
     """
-    cfg_path = os.path.join(CONFIG_PATH, f"model/{model_name}.yaml")
+    cfg_path = os.path.join(CONFIG_PATH, f"{model_name}/{model_name}_{dataset_name}.yaml")
     with open(cfg_path, "r") as f:
         model_cfg = yaml.full_load(f)
 
@@ -88,7 +88,7 @@ def setup_proc(
         proc_cfg: hyperparameters for training and evaluation processes
     """
     # Load in config file for training and evaluation processes
-    cfg_file = f"defaults_{model_name}_{dataset_name}.yaml" if not debug else "defaults_debug.yaml"
+    cfg_file = f"{model_name}/defaults_{dataset_name}.yaml" if not debug else "defaults_debug.yaml"
     cfg_path = os.path.join(CONFIG_PATH, cfg_file)
     with open(cfg_path, "r") as f:
         proc_cfg = yaml.full_load(f)
