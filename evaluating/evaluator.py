@@ -28,7 +28,7 @@ class Evaluator(object):
                 and it's only used in multi-horizon scenario.
     """
 
-    eval_metrics: Dict[str, Callable[..., Union[float]]] = {}
+    eval_metrics: Dict[str, Callable[..., float]] = {}
 
     def __init__(self, metric_names: List[str], horiz_cuts: Optional[List[int]] = None):
         self.metric_names = metric_names

@@ -63,9 +63,9 @@ class Experiment(object):
 
         # Configure the experiment
         if not infer:
-            self.dp_cfg = setup_dp(args.debug)
+            self.dp_cfg = setup_dp(args.model_name, args.dataset_name, args.debug)
             self.model_cfg = setup_model(args.model_name)
-            self.proc_cfg = setup_proc(debug=args.debug)
+            self.proc_cfg = setup_proc(args.model_name, args.dataset_name, debug=args.debug)
             self._parse_model_cfg()
             self._agg_cfg()
         else:

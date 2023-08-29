@@ -45,6 +45,12 @@ class TrainEvalArgParser(BaseArgParser):
             help="name of the model architecture",
         )
         self.argparser.add_argument(
+            "--dataset-name",
+            type=str,
+            default=None,
+            help="name of the dataset",
+        )
+        self.argparser.add_argument(
             "--eval-on-test",
             type=self._str2bool,
             default=False,

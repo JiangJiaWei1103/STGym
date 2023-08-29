@@ -32,7 +32,11 @@ def gen_exp_id(model_name: str) -> str:
     return exp_id
 
 
-def setup_dp(debug: bool = False) -> Dict[str, Any]:
+def setup_dp(
+    model_name: str,
+    dataset_name: str,
+    debug: bool = False
+) -> Dict[str, Any]:
     """Return hyperparameters controlling data processing.
 
     Parameters:
@@ -41,7 +45,7 @@ def setup_dp(debug: bool = False) -> Dict[str, Any]:
     Return:
         dp_cfg: hyperparameters of data processor
     """
-    cfg_file = "dp.yaml" if not debug else "dp_debug.yaml"
+    cfg_file = f"dp_{model_name}_{dataset_name}.yaml" if not debug else "dp_debug.yaml"
     cfg_path = os.path.join(CONFIG_PATH, cfg_file)
     with open(cfg_path, "r") as f:
         dp_cfg = yaml.full_load(f)
@@ -65,7 +69,12 @@ def setup_model(model_name: str) -> Dict[str, Any]:
     return model_cfg
 
 
-def setup_proc(seed: Optional[int] = None, debug: bool = False) -> Dict[str, Any]:
+def setup_proc(
+    model_name: str,
+    dataset_name: str,
+    seed: Optional[int] = None, 
+    debug: bool = False
+) -> Dict[str, Any]:
     """Return hyperparameters for training and evaluation processes,
     and clear local output buffer to dump outputs.
 
@@ -79,7 +88,7 @@ def setup_proc(seed: Optional[int] = None, debug: bool = False) -> Dict[str, Any
         proc_cfg: hyperparameters for training and evaluation processes
     """
     # Load in config file for training and evaluation processes
-    cfg_file = "defaults.yaml" if not debug else "defaults_debug.yaml"
+    cfg_file = f"defaults_{model_name}_{dataset_name}.yaml" if not debug else "defaults_debug.yaml"
     cfg_path = os.path.join(CONFIG_PATH, cfg_file)
     with open(cfg_path, "r") as f:
         proc_cfg = yaml.full_load(f)

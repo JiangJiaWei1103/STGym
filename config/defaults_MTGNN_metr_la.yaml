@@ -1,6 +1,6 @@
 # Common configuration for training and evaluation processes
 # ==Training==
-seed: 168
+seed: 88
 device: 'cuda:0'
 epochs: 100
 loss_fn:
@@ -22,7 +22,7 @@ ckpt_metric: null
 
 # ==DataLoader==
 dataloader:
-    batch_size: 32
+    batch_size: 64
     shuffle: True
     num_workers: 4
 
@@ -60,7 +60,7 @@ solver:
 
     # ==Learning rate scheduler==
     lr_skd:
-        name: plateau
+        name: null
         milestones: null
         # Multiplicative factor of learning rate decay
         gamma: null
@@ -74,7 +74,7 @@ solver:
 
 # ==Early Stopping==
 es:
-    patience: 10
+    patience: 100
     mode: 'min'
 
 # ==Evaluator==

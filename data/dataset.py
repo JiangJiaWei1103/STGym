@@ -151,6 +151,7 @@ class TrafficDataset(Dataset):
         t_window: int = 12,
         horizon: int = 12,
         n_tids: Optional[int] = None,
+        add_tid: bool = False,
         add_diw: bool = False,
         name: Optional[str] = None,
     ):
@@ -158,6 +159,7 @@ class TrafficDataset(Dataset):
         self.t_window = t_window
         self.horizon = horizon
         self.n_tids = n_tids
+        self.add_tid = add_tid
         self.add_diw = add_diw
 
         self._set_n_samples()
@@ -169,16 +171,39 @@ class TrafficDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, Tensor]:
         # X, y = self._get_windowed_sample(idx)
-        data_sample = {
-            "X": torch.tensor(self.X[idx], dtype=torch.float32),
-            "y": torch.tensor(self.y[idx], dtype=torch.float32),
-        }
-
         cur_time_slot = idx + self.t_window - 1
-        if self.n_tids is not None:
-            data_sample["tid"] = torch.tensor(self.tids[cur_time_slot], dtype=torch.int32)
-        if self.add_diw:
-            data_sample["diw"] = torch.tensor(self.diws[cur_time_slot], dtype=torch.int32)
+
+        X = torch.tensor(self.X[idx], dtype=torch.float32)
+        y = torch.tensor(self.y[idx], dtype=torch.float32)
+
+        if self.add_tid and self.add_diw:
+            X = self._add_aux_info(
+                X, 
+                torch.tensor(self.tids[cur_time_slot], dtype=torch.int32), 
+                torch.tensor(self.diws[cur_time_slot], dtype=torch.int32))
+            y = self._add_aux_info(
+                y, 
+                torch.tensor(self.tids[cur_time_slot + self.t_window], dtype=torch.int32),
+                torch.tensor(self.diws[cur_time_slot + self.t_window], dtype=torch.int32))
+        elif self.add_tid and not self.add_diw:
+            X = self._add_aux_info(
+                X, 
+                torch.tensor(self.tids[cur_time_slot], dtype=torch.int32))
+            y = self._add_aux_info(
+                y, 
+                torch.tensor(self.tids[cur_time_slot + self.t_window], dtype=torch.int32))
+        elif not self.add_tid and self.add_diw:
+            X = self._add_aux_info(
+                X,
+                torch.tensor(self.diws[cur_time_slot], dtype=torch.int32))
+            y = self._add_aux_info(
+                y,
+                torch.tensor(self.diws[cur_time_slot + self.t_window], dtype=torch.int32))
+
+        data_sample = {
+            "X": X,
+            "y": y,
+        }
 
         return data_sample
 
@@ -205,6 +230,45 @@ class TrafficDataset(Dataset):
                 self.diws = self.df.index.dayofweek.values
             else:
                 self.diws = (self.df.index.values // self.n_tids % N_DAYS_IN_WEEK).astype(np.int32)
+
+    def _add_aux_info(
+        self,
+        x: Tensor,
+        tid: Tensor = None,
+        diw: Tensor = None
+    ) -> Tensor:
+        """
+        Add auxiliary information along feature (i.e., channel) axis.
+
+        It's used in traffic forecasting scenarios, where time identifiers
+        are considered to be auxiliary information.
+        """
+
+        N_TIMES_IN_DAY = 288
+        N_DAYS_IN_WEEK = 7
+        self.lookback_idx = torch.arange(self.t_window)
+
+        t_window, n_series = x.shape
+        x = torch.unsqueeze(x.transpose(0, 1), dim=0)  # (C, N, T)
+
+        if self.lookback_idx.device != x.device:
+            self.lookback_idx = self.lookback_idx.to(x.device)
+
+        if tid is not None:
+            tid_expand = tid.unsqueeze(dim=-1).unsqueeze(dim=-1).expand(n_series, t_window)  # (N, T)
+            tid_back = (((tid_expand + N_TIMES_IN_DAY) - self.lookback_idx) % N_TIMES_IN_DAY).flip(
+                dims=[1]
+            ) / N_TIMES_IN_DAY
+            x = torch.cat([x, tid_back.unsqueeze(dim=0)], dim=0)
+        if diw is not None:
+            diw_expand = diw.unsqueeze(dim=-1).unsqueeze(dim=-1).expand(n_series, t_window)  # (N, T)
+            cross_day_mask = ((tid_expand - self.lookback_idx).flip(dims=[1]) < 0).int()
+            diw_back = (
+                ((diw_expand + N_DAYS_IN_WEEK) - cross_day_mask) % N_DAYS_IN_WEEK / N_DAYS_IN_WEEK
+            )
+            x = torch.cat([x, diw_back.unsqueeze(dim=0)], dim=0)
+
+        return x
 
     def _chunk_X_y(self) -> None:
         """Chunk X and y sets based on T and Q."""

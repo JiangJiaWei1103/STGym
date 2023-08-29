@@ -103,6 +103,7 @@ class MainTrainer(BaseTrainer):
             # Retrieve batched raw data
             x = batch_data["X"].to(self.device)
             y = batch_data["y"].to(self.device)
+            y = y[:, 0, :, :].transpose(1, 2)
             tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
             diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
@@ -175,6 +176,7 @@ class MainTrainer(BaseTrainer):
             # Retrieve batched raw data
             x = batch_data["X"].to(self.device)
             y = batch_data["y"].to(self.device)
+            y = y[:, 0, :, :].transpose(1, 2)
             tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
             diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
