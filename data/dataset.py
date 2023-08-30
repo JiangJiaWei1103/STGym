@@ -175,30 +175,21 @@ class TrafficDataset(Dataset):
 
         X = torch.tensor(self.X[idx], dtype=torch.float32)
         y = torch.tensor(self.y[idx], dtype=torch.float32)
+        X_tid = None
+        y_tid = None
+        X_diw = None
+        y_diw = None
 
-        if self.add_tid and self.add_diw:
-            X = self._add_aux_info(
-                X, 
-                torch.tensor(self.tids[cur_time_slot], dtype=torch.int32), 
-                torch.tensor(self.diws[cur_time_slot], dtype=torch.int32))
-            y = self._add_aux_info(
-                y, 
-                torch.tensor(self.tids[cur_time_slot + self.t_window], dtype=torch.int32),
-                torch.tensor(self.diws[cur_time_slot + self.t_window], dtype=torch.int32))
-        elif self.add_tid and not self.add_diw:
-            X = self._add_aux_info(
-                X, 
-                torch.tensor(self.tids[cur_time_slot], dtype=torch.int32))
-            y = self._add_aux_info(
-                y, 
-                torch.tensor(self.tids[cur_time_slot + self.t_window], dtype=torch.int32))
-        elif not self.add_tid and self.add_diw:
-            X = self._add_aux_info(
-                X,
-                torch.tensor(self.diws[cur_time_slot], dtype=torch.int32))
-            y = self._add_aux_info(
-                y,
-                torch.tensor(self.diws[cur_time_slot + self.t_window], dtype=torch.int32))
+        if self.add_tid:
+            X_tid = torch.tensor(self.tids[cur_time_slot], dtype=torch.int32)
+            y_tid = torch.tensor(self.tids[cur_time_slot + self.horizon], dtype=torch.int32)
+        if self.add_diw:
+            X_diw = torch.tensor(self.diws[cur_time_slot], dtype=torch.int32)
+            y_diw = torch.tensor(self.diws[cur_time_slot + self.horizon], dtype=torch.int32)
+
+        if self.add_tid or self.add_diw:
+            X = self._add_aux_info(X, X_tid, X_diw)
+            y = self._add_aux_info(y, y_tid, y_diw)
 
         data_sample = {
             "X": X,
