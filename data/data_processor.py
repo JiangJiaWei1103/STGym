@@ -75,6 +75,7 @@ class DataProcessor(object):
         if self.priori_gs["type"] is not None:
             self._init_priori_gs()
         
+        # Load auxiliary data if provided
         if self.aux_data['file_path'] is not None:
             self._load_aux_data()
 
