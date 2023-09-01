@@ -53,6 +53,7 @@ def main(args: Namespace) -> None:
         dp.run_before_splitting()
         df = dp.get_df()
         priori_gs = dp.get_priori_gs()
+        aux_data = dp.get_aux_data()
 
         # Run CV
         cv = build_cv(**exp.dp_cfg["cv"])
@@ -84,6 +85,8 @@ def main(args: Namespace) -> None:
             model_params = exp.model_params
             if priori_gs is not None:
                 model_params["priori_gs"] = priori_gs
+            if aux_data is not None:
+                model_params["aux_data"] = aux_data
             model = build_model(args.model_name, model_params)
             model.to(exp.proc_cfg["device"])
             if args.use_wandb:

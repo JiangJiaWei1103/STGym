@@ -12,6 +12,10 @@ dp:
         type: null
         k: null
 
+    # Auxiliary data
+    aux_data:
+        path: null
+
 # ==CV Scheme==
 cv:
     scheme: tssplit
@@ -23,7 +27,11 @@ cv:
 dataset:
     name: metr_la
     t_window: 12
+    day_window: 12
+    week_window: 12
     horizon: 12
+    num_of_day: null
+    num_of_week: null
 
     # Number of time slots in one day
     n_tids: 288

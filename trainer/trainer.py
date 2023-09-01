@@ -102,6 +102,8 @@ class MainTrainer(BaseTrainer):
 
             # Retrieve batched raw data
             x = batch_data["X"].to(self.device)
+            x_day = None if "X_day" not in batch_data else batch_data["X_day"].to(self.device)
+            x_week = None if "X_week" not in batch_data else batch_data["X_week"].to(self.device)
             y = batch_data["y"].to(self.device)
             y = y[:, 0, :, :].transpose(1, 2)
             tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
@@ -110,6 +112,8 @@ class MainTrainer(BaseTrainer):
             # Forward pass and derive loss
             output, *_ = self.model(
                 x,
+                x_day=x_day,
+                x_week=x_week,
                 tid=tid,
                 diw=diw,
                 ycl=y,
@@ -176,12 +180,20 @@ class MainTrainer(BaseTrainer):
             # Retrieve batched raw data
             x = batch_data["X"].to(self.device)
             y = batch_data["y"].to(self.device)
+            x_day = None if "X_day" not in batch_data else batch_data["X_day"].to(self.device)
+            x_week = None if "X_week" not in batch_data else batch_data["X_week"].to(self.device)
             y = y[:, 0, :, :].transpose(1, 2)
             tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
             diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
             # Forward pass
-            output, *_ = self.model(x, tid=tid, diw=diw)
+            output, *_ = self.model(
+                x,
+                x_day=x_day,
+                x_week=x_week,
+                tid=tid,
+                diw=diw
+            )
 
             # Derive loss
             if self.rescale:

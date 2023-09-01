@@ -149,6 +149,10 @@ class TrafficDataset(Dataset):
         self,
         df: Union[pd.DataFrame, np.ndarray],
         t_window: int = 12,
+        day_window: Optional[int] = None,
+        week_window: Optional[int] = None,
+        num_of_day: Optional[int] = None,
+        num_of_week: Optional[int] = None,
         horizon: int = 12,
         n_tids: Optional[int] = None,
         add_tid: bool = False,
@@ -157,6 +161,10 @@ class TrafficDataset(Dataset):
     ):
         self.df = df
         self.t_window = t_window
+        self.day_window = day_window
+        self.week_window = week_window
+        self.num_of_day = num_of_day
+        self.num_of_week = num_of_week
         self.horizon = horizon
         self.n_tids = n_tids
         self.add_tid = add_tid
@@ -191,17 +199,44 @@ class TrafficDataset(Dataset):
             X = self._add_aux_info(X, X_tid, X_diw)
             y = self._add_aux_info(y, y_tid, y_diw)
 
-        data_sample = {
-            "X": X,
-            "y": y,
-        }
+        if (self.num_of_day is None) and (self.num_of_week is None):
+            data_sample = {
+                "X": X,
+                "y": y,
+            }
+        elif (self.num_of_day is not None) and (self.num_of_week is None):
+            data_sample = {
+                "X": X,
+                "X_day": torch.tensor(self.X_day[idx], dtype=torch.float32),
+                "y": y,
+            }
+        elif (self.num_of_day is None) and (self.num_of_week is not None):
+            data_sample = {
+                "X": X,
+                "X_week": torch.tensor(self.X_week[idx], dtype=torch.float32),
+                "y": y,
+            }
+        else:
+            data_sample = {
+                "X": X,
+                "X_day": torch.tensor(self.X_day[idx], dtype=torch.float32),
+                "X_week": torch.tensor(self.X_week[idx], dtype=torch.float32),
+                "y": y,
+            }
 
         return data_sample
 
     def _set_n_samples(self) -> None:
         """Set number of samples."""
-        self.offset = self.t_window + self.horizon - 1
-        self.n_samples = len(self.df) - self.offset
+        if (self.num_of_day is None) and (self.num_of_week is None):
+            self.offset = self.t_window + self.horizon - 1
+            self.n_samples = len(self.df) - self.offset
+        elif (self.num_of_day is not None) and (self.num_of_week is None):
+            self.offset = self.n_tids * self.num_of_day + self.horizon - 1
+            self.n_samples = len(self.df) - self.offset
+        else:
+            self.offset = self.n_tids * 7 * self.num_of_week + self.horizon - 1
+            self.n_samples = len(self.df) - self.offset
 
     def _add_aux_feats(self) -> None:
         """Add auxiliary features (i.e., time identifiers)."""
@@ -235,7 +270,7 @@ class TrafficDataset(Dataset):
         are considered to be auxiliary information.
         """
 
-        N_TIMES_IN_DAY = 288
+        N_TIMES_IN_DAY = self.n_tids
         N_DAYS_IN_WEEK = 7
         self.lookback_idx = torch.arange(self.t_window)
 
@@ -267,15 +302,86 @@ class TrafficDataset(Dataset):
             data_vals = self.df.values
         else:
             data_vals = self.df
+        
+        if (self.num_of_day is None) and (self.num_of_week is None):
+            X = []
+            y = []
+            for i in range(self.n_samples):
+                X.append(data_vals[i : i + self.t_window, :])
+                y.append(data_vals[i + self.t_window : i + self.offset + 1, :])
 
-        X = []
-        y = []
-        for i in range(self.n_samples):
-            X.append(data_vals[i : i + self.t_window, :])
-            y.append(data_vals[i + self.t_window : i + self.offset + 1, :])
+            self.X = np.stack(X)  # (M, T, N)
+            self.y = np.stack(y)  # (M, Q, N)
 
-        self.X = np.stack(X)  # (M, T, N)
-        self.y = np.stack(y)  # (M, Q, N)
+        elif (self.num_of_day is not None) and (self.num_of_week is None):
+            X = []
+            X_day = []
+            y = []
+            for i in range(self.n_samples):
+                start = self.n_tids * self.num_of_day - self.t_window + i
+                day = np.empty((0, data_vals.shape[1]))
+                for j in range(self.num_of_day):
+                    day = np.concatenate(
+                        [day, 
+                         data_vals[i + j * self.n_tids : 
+                                   i + j * self.n_tids + self.day_window, :]])
+                X.append(data_vals[start : start + self.t_window, :])
+                X_day.append(day)
+                y.append(data_vals[start + self.t_window : i + self.offset + 1, :])
+
+            self.X = np.stack(X)          # (M, T, N)
+            self.X_day = np.stack(X_day)  # (M, T_day, N)
+            self.y = np.stack(y)          # (M, Q, N)
+
+        elif (self.num_of_day is None) and (self.num_of_week is not None):
+            X = []
+            X_week = []
+            y = []
+            for i in range(self.n_samples):
+                start = self.n_tids * 7 * self.num_of_week - self.t_window + i
+                week = np.empty((0, data_vals.shape[1]))
+                for j in range(self.num_of_week):
+                    week = np.concatenate(
+                        [week, 
+                         data_vals[i + j * self.n_tids * 7 : 
+                                   i + j * self.n_tids * 7 + self.week_window, :]])
+                X.append(data_vals[start : start + self.t_window, :])
+                X_week.append(week)
+                y.append(data_vals[start + self.t_window : i + self.offset + 1, :])
+            
+            self.X = np.stack(X)            # (M, T, N)
+            self.X_week = np.stack(X_week)  # (M, T_week, N)
+            self.y = np.stack(y)            # (M, Q, N)
+
+        else:
+            X = []
+            X_day = []
+            X_week = []
+            y = []
+            for i in range(self.n_samples):
+                start = self.n_tids * 7 * self.num_of_week - self.t_window + i
+                start_day = start + self.t_window - self.num_of_day * self.n_tids
+                day = np.empty((0, data_vals.shape[1]))
+                for j in range(self.num_of_day):
+                    day = np.concatenate(
+                        [day, 
+                         data_vals[start_day + j * self.n_tids : 
+                                   start_day + j * self.n_tids + self.day_window, :]])
+                week = np.empty((0, data_vals.shape[1]))
+                for k in range(self.num_of_week):
+                    week = np.concatenate(
+                        [week, 
+                         data_vals[i + k * self.n_tids * 7 : 
+                                   i + k * self.n_tids * 7 + self.week_window, :]])
+                X.append(data_vals[start : start + self.t_window, :])
+                X_day.append(day)
+                X_week.append(week)
+                y.append(data_vals[start + self.t_window : i + self.offset + 1, :])
+
+            self.X = np.stack(X)            # (M, T, N)
+            self.X_day = np.stack(X_day)    # (M, T_day, N)
+            self.X_week = np.stack(X_week)  # (M, T_week, N)
+            self.y = np.stack(y)            # (M, Q, N)
 
     def _get_windowed_sample(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
         """Return (X, y) sample based on idx passed into __getitem__.

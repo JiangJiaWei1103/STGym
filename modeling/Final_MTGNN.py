@@ -219,7 +219,7 @@ class MTGNN(nn.Module):
         output = torch.squeeze(x)
 
         return output, None, None
-    
+
 class _MTGNNLayer(nn.Module):
     """
     MTGNN layer.

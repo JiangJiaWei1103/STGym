@@ -110,6 +110,10 @@ class DataProcessor(object):
     def get_priori_gs(self) -> Optional[List[Tensor]]:
         """Return priori graph structure."""
         return self._priori_adj_mat
+    
+    def get_aux_data(self) -> List[np.ndarray]:
+        """Return auxiliary data."""
+        return self._aux_data
 
     def _setup(self) -> None:
         """Retrieve all parameters specified to process data."""
@@ -120,6 +124,7 @@ class DataProcessor(object):
         # After data splitting
         self.scaling = self._dp_cfg["scaling"]
         self.priori_gs = self._dp_cfg["priori_gs"]
+        self.aux_data = self._dp_cfg["aux_data"]
 
     def _holdout(self) -> None:
         """Holdout unseen test set before running CV iteration.
@@ -175,6 +180,32 @@ class DataProcessor(object):
                 raise RuntimeError(f"Priori GS {priori_gs_type} isn't registered...")
 
         logging.info(f"Priori GS {priori_gs_type} has been set up!")
+
+    def _load_aux_data(self) -> None:
+        """
+        Load auxiliary data.
+        """
+        file_path = self.aux_data["file_path"]
+        self._aux_data = []
+
+        for path in file_path:
+            if file_path.endswith("npz"):
+                self._aux_data.append(np.load(file_path, allow_pickle=True))
+            elif file_path.endswith("txt"):
+                self._aux_data.append(np.loadtxt(file_path, delimiter=","))
+            elif file_path.endswith("h5"):
+                self._aux_data.append(pd.read_hdf(file_path).values)
+            elif file_path.endswith("csv"):
+                self._aux_data.append(pd.read_csv(file_path).values)
+            elif file_path.endswith("pkl"):
+                try:
+                    with open(file_path, "rb") as f:
+                        self._aux_data.append(pickle.load(f))
+                except UnicodeDecodeError as e:
+                    with open(file_path, "rb") as f:
+                        self._aux_data.append(pickle.load(f, encoding="latin1"))
+            else:
+                raise RuntimeError(f"File type {file_path} isn't registered...")
 
     def _load_adj_mat(self) -> np.ndarray:
         """Load hand-crafted adjacency matrix.
