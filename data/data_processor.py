@@ -74,6 +74,9 @@ class DataProcessor(object):
         # Initialize priori graph structure if provided
         if self.priori_gs["type"] is not None:
             self._init_priori_gs()
+        
+        if self.aux_data['file_path'] is not None:
+            self._load_aux_data()
 
     def run_after_splitting(
         self,
@@ -189,23 +192,23 @@ class DataProcessor(object):
         self._aux_data = []
 
         for path in file_path:
-            if file_path.endswith("npz"):
-                self._aux_data.append(np.load(file_path, allow_pickle=True))
-            elif file_path.endswith("txt"):
-                self._aux_data.append(np.loadtxt(file_path, delimiter=","))
-            elif file_path.endswith("h5"):
-                self._aux_data.append(pd.read_hdf(file_path).values)
-            elif file_path.endswith("csv"):
-                self._aux_data.append(pd.read_csv(file_path).values)
-            elif file_path.endswith("pkl"):
+            if path.endswith("npz"):
+                self._aux_data.append(np.load(path, allow_pickle=True))
+            elif path.endswith("txt"):
+                self._aux_data.append(np.loadtxt(path, delimiter=","))
+            elif path.endswith("h5"):
+                self._aux_data.append(pd.read_hdf(path).values)
+            elif path.endswith("csv"):
+                self._aux_data.append(pd.read_csv(path).values)
+            elif path.endswith("pkl"):
                 try:
-                    with open(file_path, "rb") as f:
+                    with open(path, "rb") as f:
                         self._aux_data.append(pickle.load(f))
                 except UnicodeDecodeError as e:
-                    with open(file_path, "rb") as f:
+                    with open(path, "rb") as f:
                         self._aux_data.append(pickle.load(f, encoding="latin1"))
             else:
-                raise RuntimeError(f"File type {file_path} isn't registered...")
+                raise RuntimeError(f"File type {path} isn't registered...")
 
     def _load_adj_mat(self) -> np.ndarray:
         """Load hand-crafted adjacency matrix.

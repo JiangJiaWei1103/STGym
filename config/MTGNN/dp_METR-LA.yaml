@@ -14,7 +14,7 @@ dp:
 
     # Auxiliary data
     aux_data:
-        path: null
+        file_path: null
 
 # ==CV Scheme==
 cv:
