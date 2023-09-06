@@ -196,8 +196,8 @@ class TrafficDataset(Dataset):
             y_diw = torch.tensor(self.diws[cur_time_slot + self.horizon], dtype=torch.int32)
 
         if self.add_tid or self.add_diw:
-            X = self._add_aux_info(X, X_tid, X_diw)
-            y = self._add_aux_info(y, y_tid, y_diw)
+            X = self._add_aux_info(X.squeeze(0).transpose(1, 0), X_tid, X_diw)
+            y = self._add_aux_info(y.squeeze(0).transpose(1, 0), y_tid, y_diw)
 
         if (self.num_of_day is None) and (self.num_of_week is None):
             data_sample = {
@@ -310,8 +310,8 @@ class TrafficDataset(Dataset):
                 X.append(data_vals[i : i + self.t_window, :])
                 y.append(data_vals[i + self.t_window : i + self.offset + 1, :])
 
-            self.X = np.stack(X)  # (M, T, N)
-            self.y = np.stack(y)  # (M, Q, N)
+            self.X = np.expand_dims(np.stack(X).transpose(0 ,2, 1), 1)  # (M, 1, N, T)
+            self.y = np.expand_dims(np.stack(y).transpose(0 ,2, 1), 1)  # (M, 1, Q, N)
 
         elif (self.num_of_day is not None) and (self.num_of_week is None):
             X = []
@@ -329,9 +329,9 @@ class TrafficDataset(Dataset):
                 X_day.append(day)
                 y.append(data_vals[start + self.t_window : i + self.offset + 1, :])
 
-            self.X = np.stack(X)          # (M, T, N)
-            self.X_day = np.stack(X_day)  # (M, T_day, N)
-            self.y = np.stack(y)          # (M, Q, N)
+            self.X = np.expand_dims(np.stack(X).transpose(0 ,2, 1), 1)  # (M, 1, N, T)
+            self.X_day = np.expand_dims(np.stack(X_day).transpose(0 ,2, 1), 1)  # (M, 1, N, T_day)
+            self.y = np.expand_dims(np.stack(y).transpose(0 ,2, 1), 1)  # (M, 1, Q, N)
 
         elif (self.num_of_day is None) and (self.num_of_week is not None):
             X = []
@@ -349,9 +349,9 @@ class TrafficDataset(Dataset):
                 X_week.append(week)
                 y.append(data_vals[start + self.t_window : i + self.offset + 1, :])
             
-            self.X = np.stack(X)            # (M, T, N)
-            self.X_week = np.stack(X_week)  # (M, T_week, N)
-            self.y = np.stack(y)            # (M, Q, N)
+            self.X = np.expand_dims(np.stack(X).transpose(0 ,2, 1), 1)  # (M, 1, N, T)
+            self.X_week = np.expand_dims(np.stack(X_week).transpose(0 ,2, 1), 1)  # (M, 1, N, T_week)
+            self.y = np.expand_dims(np.stack(y).transpose(0 ,2, 1), 1)  # (M, 1, Q, N)
 
         else:
             X = []
@@ -378,10 +378,10 @@ class TrafficDataset(Dataset):
                 X_week.append(week)
                 y.append(data_vals[start + self.t_window : i + self.offset + 1, :])
 
-            self.X = np.stack(X)            # (M, T, N)
-            self.X_day = np.stack(X_day)    # (M, T_day, N)
-            self.X_week = np.stack(X_week)  # (M, T_week, N)
-            self.y = np.stack(y)            # (M, Q, N)
+            self.X = np.expand_dims(np.stack(X).transpose(0 ,2, 1), 1)  # (M, 1, N, T)
+            self.X_day = np.expand_dims(np.stack(X_day).transpose(0 ,2, 1), 1)  # (M, 1, N, T_day)
+            self.X_week = np.expand_dims(np.stack(X_week).transpose(0 ,2, 1), 1)  # (M, 1, N, T_week)
+            self.y = np.expand_dims(np.stack(y).transpose(0 ,2, 1), 1)  # (M, 1, Q, N)
 
     def _get_windowed_sample(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
         """Return (X, y) sample based on idx passed into __getitem__.

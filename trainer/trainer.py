@@ -105,7 +105,6 @@ class MainTrainer(BaseTrainer):
             x_day = None if "X_day" not in batch_data else batch_data["X_day"].to(self.device)
             x_week = None if "X_week" not in batch_data else batch_data["X_week"].to(self.device)
             y = batch_data["y"].to(self.device)
-            y = y[:, 0, :, :].transpose(1, 2)
             tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
             diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
@@ -122,10 +121,11 @@ class MainTrainer(BaseTrainer):
             )
 
             # Inverse transform to the original scale
+            if len(y.shape) == 4: y = y[:, 0, :, :].transpose(1, 2)
             if self.rescale:
                 output = self.scaler.inverse_transform(output)
                 y = self.scaler.inverse_transform(y)
-
+                
             # Derive loss
             if self._cl is not None:
                 task_lv = self._cl.get_task_lv()
@@ -182,7 +182,6 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
             x_day = None if "X_day" not in batch_data else batch_data["X_day"].to(self.device)
             x_week = None if "X_week" not in batch_data else batch_data["X_week"].to(self.device)
-            y = y[:, 0, :, :].transpose(1, 2)
             tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
             diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
@@ -196,6 +195,7 @@ class MainTrainer(BaseTrainer):
             )
 
             # Derive loss
+            if len(y.shape) == 4: y = y[:, 0, :, :].transpose(1, 2)
             if self.rescale:
                 loss = self.loss_fn(
                     self.scaler.inverse_transform(output),
