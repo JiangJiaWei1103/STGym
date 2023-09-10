@@ -9,7 +9,6 @@ import math
 from typing import Iterator, Tuple
 
 import numpy as np
-import pandas as pd
 
 
 class TSSplit(object):
@@ -27,7 +26,7 @@ class TSSplit(object):
         self.train_ratio = train_ratio
         self.val_ratio = val_ratio
 
-    def split(self, X: pd.DataFrame) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+    def split(self, X: np.ndarray) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
         """Return indices of training and validation sets.
 
         Because this is the implementation of naive train/val split,
@@ -35,7 +34,7 @@ class TSSplit(object):
         fold is considered to cater to the common experimental setting.
 
         Parameters:
-            X: raw DataFrame
+            X: input data
 
         Yield:
             tr_idx: training set indices for current split

@@ -5,59 +5,66 @@ Author: JiaWei Jiang
 This file contains definitions of multiple datasets used in different
 scenarios.
 
-* [ ] Define a `BaseDataset`.
+* [ ] Define a `BaseDataset` (e.g., containing common dataset attrs).
 """
-from typing import Any, Dict, Optional, Tuple, Union
+from dataclasses import dataclass, field
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import pandas as pd
 import torch
-from pandas.api.types import is_datetime64_any_dtype
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from metadata import N_DAYS_IN_WEEK
+
+@dataclass
+class _TimeSeriesAttr:
+    """Common time series attributes.
+
+    Commonly used notations are defined as follows:
+    * M: number of rows in processed data
+    * N: number of time series
+    * P: lookback time window
+    * Q: predicting horizon
+    """
+
+    M: int
+    N: int
+    P: int
+    Q: int
+    offset: int = field(init=False)
+    n_samples: int = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.offset = self.P + self.Q - 1
+        self.n_samples = self.M - self.offset
 
 
 class BenchmarkDataset(Dataset):
     """Benchmark Dataset for open source datasets in MTSF domain.
 
-    Denote M as the number of total samples.
+    Data contains only time series numeric values.
 
     Parameters:
-        df: processed data
+        data: processed data
         t_window: lookback time window, denoted by T
         horizon: predicting horizon, denoted by Q
-        n_tids: number of time slots per day
-        add_diw: whether to add day in week as auxiliary feature
-        name: name of the specified dataset, for compatibility
     """
-
-    tids: Optional[np.ndarray] = None
-    diws: Optional[np.ndarray] = None
 
     def __init__(
         self,
-        df: pd.DataFrame,
+        data: np.ndarray,
         t_window: int,
         horizon: int,
-        n_tids: Optional[int] = None,
-        add_diw: bool = False,
-        name: Optional[str] = None,
         **kwargs: Any,
     ):
-        self.df = df
-        self.t_window = t_window
-        self.horizon = horizon
-        self.n_tids = n_tids
-        self.add_diw = add_diw
+        self.data = data
+        self.ts_attr = _TimeSeriesAttr(len(data), data.shape[1], t_window, horizon)
 
-        self._set_n_samples()
-        self._add_aux_feats()
         self._chunk_X_y()
 
     def __len__(self) -> int:
-        return self.n_samples
+        return self.ts_attr.n_samples
 
     def __getitem__(self, idx: int) -> Dict[str, Tensor]:
         # X, y = self._get_windowed_sample(idx)
@@ -66,48 +73,24 @@ class BenchmarkDataset(Dataset):
             "y": torch.tensor(self.y[idx], dtype=torch.float32),
         }
 
-        cur_time_slot = idx + self.t_window - 1
-        if self.n_tids is not None:
-            data_sample["tid"] = torch.tensor(self.tids[cur_time_slot], dtype=torch.int32)
-        if self.add_diw:
-            data_sample["diw"] = torch.tensor(self.diws[cur_time_slot], dtype=torch.int32)
+        # cur_time_slot = idx + self.t_window - 1
+        # if self.n_tids is not None:
+        #    data_sample["tid"] = torch.tensor(self.tids[cur_time_slot], dtype=torch.int32)
+        # if self.add_diw:
+        #    data_sample["diw"] = torch.tensor(self.diws[cur_time_slot], dtype=torch.int32)
 
         return data_sample
 
-    def _set_n_samples(self) -> None:
-        """Set number of samples."""
-        self.offset = self.t_window + self.horizon - 1
-        self.n_samples = len(self.df) - self.offset
-
-    def _add_aux_feats(self) -> None:
-        """Add auxiliary features (i.e., time identifiers)."""
-        # Add time in day
-        if self.n_tids is not None:
-            time_vals = self.df.index.values
-            if is_datetime64_any_dtype(self.df.index):
-                self.tids = (time_vals - time_vals.astype("datetime64[D]")) / np.timedelta64(1, "D")
-                tids_uniq = sorted(np.unique(self.tids))
-                self.tids = (self.tids / tids_uniq[1]).astype(np.int32)
-            else:
-                self.tids = (time_vals % self.n_tids).astype(np.int32)
-
-        # Add day in week
-        if self.add_diw:
-            if is_datetime64_any_dtype(self.df.index):
-                self.diws = self.df.index.dayofweek.values
-            else:
-                self.diws = (self.df.index.values // self.n_tids % N_DAYS_IN_WEEK).astype(np.int32)
-
     def _chunk_X_y(self) -> None:
-        """Chunk X and y sets based on T and Q."""
+        """Chunk X and y sets based on lookback and horizon."""
         X = []
         y = []
 
-        for i in range(self.n_samples):
-            X.append(self.df.values[i : i + self.t_window, :])
-            y.append(self.df.values[i + self.offset, :])
+        for i in range(self.ts_attr.n_samples):
+            X.append(self.data[i : i + self.ts_attr.P, ...])
+            y.append(self.data[i + self.ts_attr.offset, :, 0])
 
-        self.X = np.stack(X)  # (M, T, N)
+        self.X = np.stack(X)  # (M, P, N, C)
         self.y = np.stack(y)  # (M, N), Q = 1 for single-horizon
 
     def _get_windowed_sample(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -120,8 +103,8 @@ class BenchmarkDataset(Dataset):
             X: X sample corresponding to the given index
             y: y sample corresponding to the given index
         """
-        X = self.df.values[idx : idx + self.t_window, :]
-        y = self.df.values[idx + self.offset, :]
+        X = self.data.values[idx : idx + self.t_window, :]
+        y = self.data.values[idx + self.offset, :]
 
         return X, y
 
@@ -134,7 +117,7 @@ class TrafficDataset(Dataset):
     That is, forecasting is done for one hour later in the future.
 
     Parameters:
-        df: processed data
+        data: processed data
         t_window: lookback time window
         horizon: predicting horizon
         n_tids: number of time slots per day
@@ -142,30 +125,20 @@ class TrafficDataset(Dataset):
         name: name of the specified dataset, for compatibility
     """
 
-    tids: Optional[np.ndarray] = None
-    diws: Optional[np.ndarray] = None
-
     def __init__(
         self,
-        df: Union[pd.DataFrame, np.ndarray],
-        t_window: int = 12,
-        horizon: int = 12,
-        n_tids: Optional[int] = None,
-        add_diw: bool = False,
-        name: Optional[str] = None,
+        data: np.ndarray,
+        t_window: int,
+        horizon: int,
+        **kwargs: Any,
     ):
-        self.df = df
-        self.t_window = t_window
-        self.horizon = horizon
-        self.n_tids = n_tids
-        self.add_diw = add_diw
+        self.data = data
+        self.ts_attr = _TimeSeriesAttr(len(data), data.shape[1], t_window, horizon)
 
-        self._set_n_samples()
-        self._add_aux_feats()
         self._chunk_X_y()
 
     def __len__(self) -> int:
-        return self.n_samples
+        return self.ts_attr.n_samples
 
     def __getitem__(self, idx: int) -> Dict[str, Tensor]:
         # X, y = self._get_windowed_sample(idx)
@@ -174,53 +147,24 @@ class TrafficDataset(Dataset):
             "y": torch.tensor(self.y[idx], dtype=torch.float32),
         }
 
-        cur_time_slot = idx + self.t_window - 1
-        if self.n_tids is not None:
-            data_sample["tid"] = torch.tensor(self.tids[cur_time_slot], dtype=torch.int32)
-        if self.add_diw:
-            data_sample["diw"] = torch.tensor(self.diws[cur_time_slot], dtype=torch.int32)
+        # cur_time_slot = idx + self.t_window - 1
+        # if self.n_tids is not None:
+        #    data_sample["tid"] = torch.tensor(self.tids[cur_time_slot], dtype=torch.int32)
+        # if self.add_diw:
+        #   data_sample["diw"] = torch.tensor(self.diws[cur_time_slot], dtype=torch.int32)
 
         return data_sample
 
-    def _set_n_samples(self) -> None:
-        """Set number of samples."""
-        self.offset = self.t_window + self.horizon - 1
-        self.n_samples = len(self.df) - self.offset
-
-    def _add_aux_feats(self) -> None:
-        """Add auxiliary features (i.e., time identifiers)."""
-        # Add time in day
-        if self.n_tids is not None:
-            time_vals = self.df.index.values
-            if is_datetime64_any_dtype(self.df.index):
-                self.tids = (time_vals - time_vals.astype("datetime64[D]")) / np.timedelta64(1, "D")
-                tids_uniq = sorted(np.unique(self.tids))
-                self.tids = (self.tids / tids_uniq[1]).astype(np.int32)
-            else:
-                self.tids = (time_vals % self.n_tids).astype(np.int32)
-
-        # Add day in week
-        if self.add_diw:
-            if is_datetime64_any_dtype(self.df.index):
-                self.diws = self.df.index.dayofweek.values
-            else:
-                self.diws = (self.df.index.values // self.n_tids % N_DAYS_IN_WEEK).astype(np.int32)
-
     def _chunk_X_y(self) -> None:
-        """Chunk X and y sets based on T and Q."""
-        if isinstance(self.df, pd.DataFrame):
-            data_vals = self.df.values
-        else:
-            data_vals = self.df
-
+        """Chunk X and y sets based on lookback and horizon"""
         X = []
         y = []
-        for i in range(self.n_samples):
-            X.append(data_vals[i : i + self.t_window, :])
-            y.append(data_vals[i + self.t_window : i + self.offset + 1, :])
+        for i in range(self.ts_attr.n_samples):
+            X.append(self.data[i : i + self.ts_attr.P, ...])
+            y.append(self.data[i + self.ts_attr.P : i + self.ts_attr.offset + 1, ...])
 
-        self.X = np.stack(X)  # (M, T, N)
-        self.y = np.stack(y)  # (M, Q, N)
+        self.X = np.stack(X)  # (M, P, N, C)
+        self.y = np.stack(y)  # (M, Q, N, C)
 
     def _get_windowed_sample(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
         """Return (X, y) sample based on idx passed into __getitem__.
@@ -235,10 +179,10 @@ class TrafficDataset(Dataset):
             X: X sample corresponding to the given index
             y: y sample corresponding to the given index
         """
-        if isinstance(self.df, pd.DataFrame):
-            data_vals = self.df.values
+        if isinstance(self.data, pd.DataFrame):
+            data_vals = self.data.values
         else:
-            data_vals = self.df
+            data_vals = self.data
 
         X = data_vals[idx : idx + self.t_window, :]
         y = data_vals[idx + self.t_window : idx + self.offset + 1, :]

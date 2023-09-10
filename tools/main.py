@@ -5,12 +5,13 @@ Author: JiaWei Jiang
 This script is used to run training and evaluation processes given the
 specified CV scheme. Moreover, evaluation on unseen (test) data is
 optional.
+
+* [ ] Add wandb tracker via public method in `Experiment` (e.g.,
+    `add_wnb_entry` method).
 """
 import gc
 import warnings
 from argparse import Namespace
-
-import pandas as pd
 
 import wandb
 from base.base_trainer import BaseTrainer
@@ -46,17 +47,14 @@ def main(args: Namespace) -> None:
         exp.dump_cfg(exp.cfg, "cfg")
 
         # Prepare data
-        dp = DataProcessor(
-            args.input_path,
-            **{**exp.dp_cfg["dp"], "dataset_name": exp.dp_cfg["dataset"]["name"]},
-        )
+        dp = DataProcessor(args.input_path, exp.dp_cfg["dataset_name"], **exp.dp_cfg["dp"])
         dp.run_before_splitting()
-        df = dp.get_df()
+        data = dp.get_data_cv()
         priori_gs = dp.get_priori_gs()
 
         # Run CV
         cv = build_cv(**exp.dp_cfg["cv"])
-        for i, (tr_idx, val_idx) in enumerate(cv.split(X=df)):
+        for i, (tr_idx, val_idx) in enumerate(cv.split(X=data)):
             # Configure sub-entry for tracking current fold
             if args.use_wandb:
                 sub_entry = wandb.init(
@@ -65,17 +63,15 @@ def main(args: Namespace) -> None:
                     job_type="train_eval",
                     name=f"fold{i}",
                 )
-            exp.log(f"Training and evaluation process of fold{i} starts...")
+            exp.log(f"\n== Train and Eval Process - Fold{i} ==")
 
             # Build dataloaders
-            if isinstance(df, pd.DataFrame):
-                df_tr, df_val = df.iloc[tr_idx, :], df.iloc[val_idx, :]
-            else:
-                df_tr, df_val = df[tr_idx, :], df[val_idx, :]
-            df_tr, df_val, scaler = dp.run_after_splitting(df_tr, df_val)
+            data_tr, data_val = data[tr_idx, ...], data[val_idx, ...]
+            data_tr, data_val, scaler = dp.run_after_splitting(data_tr, data_val)
             train_loader, val_loader = build_dataloaders(
-                df_tr,
-                df_val,
+                exp.dp_cfg["dataset_name"],
+                data_tr,
+                data_val,
                 **exp.proc_cfg["dataloader"],
                 **exp.dp_cfg["dataset"],
             )
@@ -129,10 +125,10 @@ def main(args: Namespace) -> None:
 
             # Run evaluation on unseen test set
             if args.eval_on_test:
-                df_test = dp.get_df_test()
+                data_test = dp.get_data_test()
                 _, test_loader = build_dataloaders(
-                    df_tr,
-                    df_test,
+                    data_tr,
+                    data_test,
                     **exp.proc_cfg["dataloader"],
                     **exp.dp_cfg["dataset"],
                 )
@@ -146,8 +142,8 @@ def main(args: Namespace) -> None:
 
             # Free mem.
             del (
-                df_tr,
-                df_val,
+                data_tr,
+                data_val,
                 train_loader,
                 val_loader,
                 model,

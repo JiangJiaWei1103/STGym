@@ -1,11 +1,21 @@
 # Configuration for data processing
+# ==Metadata==
+dataset_name: pems03
+
 # ==Data Processing==
 dp:
+    # Time stamp encoder
+    time_enc:
+      add_tid: True
+      add_diw: True
+      n_tids: 288
+      max_norm: False
+
     # Holdout (fixed)
     holdout_ratio: 0.2
 
     # Scaling
-    scaling: max
+    scaling: minmax  # standard
 
     # Priori graph structure
     priori_gs:
@@ -21,12 +31,5 @@ cv:
 
 # ==Dataset==
 dataset:
-    name: electricity
-    t_window: 168
-    horizon: 3
-
-    # Number of time slots in one day
-    n_tids: null
-
-    # If True, add "Day in week" identifier as the auxiliary feature
-    add_diw: False
+    t_window: 12
+    horizon: 12

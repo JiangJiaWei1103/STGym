@@ -159,7 +159,11 @@ class HARDPurG(nn.Module):
             As: (1, N, N), B is always equal to 1, because the graph
                 structure is static through time
         """
-        batch_size, t_window, n_series = x.shape
+        batch_size, t_window, n_series, n_feats = x.shape
+        if n_feats > 1:
+            tid = x[:, -1, 0, 1].int()
+            diw = x[:, -1, 0, 2].int()
+        x = x[..., 0]
 
         # Temporal pattern initializer
         x_init = self.tpi(x)
