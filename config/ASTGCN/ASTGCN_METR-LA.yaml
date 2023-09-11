@@ -1,0 +1,21 @@
+# Configuration file for model architecture `AGCRN`
+model_params:
+    # Spatial/Temporal pattern extractor
+    st_params:
+        num_block: 2
+        in_channels: 1 
+        K: 3
+        num_chev_filter: 64
+        num_time_filter: 64
+        t_window: 12
+        day_window: 12
+        week_window: 12
+        num_of_hour: 1
+        num_of_day: 1
+        num_of_week: 1
+        n_series: 207
+
+    device: 'cuda:0'
+    out_dim: 12
+
+fit_params:

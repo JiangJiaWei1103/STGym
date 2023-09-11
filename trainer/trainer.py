@@ -121,12 +121,13 @@ class MainTrainer(BaseTrainer):
             )
 
             # Inverse transform to the original scale
-            if len(y.shape) == 4: y = y[:, 0, :, :].transpose(1, 2)
             if self.rescale:
                 output = self.scaler.inverse_transform(output)
                 y = self.scaler.inverse_transform(y)
                 
             # Derive loss
+            if y.dim() == 4:
+                y = y[..., 0]
             if self._cl is not None:
                 task_lv = self._cl.get_task_lv()
                 loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
@@ -195,7 +196,8 @@ class MainTrainer(BaseTrainer):
             )
 
             # Derive loss
-            if len(y.shape) == 4: y = y[:, 0, :, :].transpose(1, 2)
+            if y.dim() == 4:
+                y = y[..., 0]
             if self.rescale:
                 loss = self.loss_fn(
                     self.scaler.inverse_transform(output),

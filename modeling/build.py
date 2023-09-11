@@ -15,6 +15,7 @@ from torch.nn import Module
 
 from .Final import HARDPurG
 from .Final_MTGNN import MTGNN
+from .Final_ASTGCN import ASTGCN
 
 
 def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
@@ -32,6 +33,8 @@ def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
         model = HARDPurG(**model_cfg)
     elif model_name == "MTGNN":
         model = MTGNN(**model_cfg)
+    elif model_name == "ASTGCN":
+        model = ASTGCN(**model_cfg)
     else:
         raise RuntimeError(f"{model_name} isn't registered.")
 

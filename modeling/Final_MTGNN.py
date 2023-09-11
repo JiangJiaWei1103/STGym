@@ -181,12 +181,14 @@ class MTGNN(nn.Module):
             output: prediction
 
         Shape:
-            x: (B, T, N), where B is the batch_size, T is the lookback
+            x: (B, T, N, C), where B is the batch_size, T is the lookback
                 time window and N is the number of time series
             tid: (B, )
             diw: (B, )
             output: (B, out_dim, N)
         """
+        input = input.permute(0, 3, 2, 1)   # (B, C, N, T)
+        
         seq_len = input.size(3)
         assert seq_len==self.t_window, 'input sequence length not equal to preset t_window'
 
