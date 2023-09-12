@@ -70,10 +70,24 @@ class BenchmarkDataset(Dataset):
         data: np.ndarray,
         t_window: int,
         horizon: int,
+        n_tids: Optional[int] = None,
+        day_window: Optional[int] = None,
+        week_window: Optional[int] = None,
+        num_of_day: Optional[int] = None,
+        num_of_week: Optional[int] = None, 
         **kwargs: Any,
     ):
         self.data = data
-        self.ts_attr = _TimeSeriesAttr(len(data), data.shape[1], t_window, horizon)
+        self.ts_attr = _TimeSeriesAttr(
+            len(data),
+            data.shape[1],
+            t_window,
+            horizon,
+            day_window,
+            week_window,
+            num_of_day,
+            num_of_week,
+            n_tids)
 
         self._chunk_X_y()
 
@@ -152,12 +166,6 @@ class TrafficDataset(Dataset):
     ):
         self.data = data
         self.t_window = t_window
-        self.day_window = day_window
-        self.week_window = week_window
-        self.num_of_day = num_of_day
-        self.num_of_week = num_of_week
-        self.horizon = horizon
-        self.n_tids = n_tids
 
         self.ts_attr = _TimeSeriesAttr(
             len(data),

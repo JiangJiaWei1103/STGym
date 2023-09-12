@@ -4,7 +4,7 @@ dataset_name: metr_la
 
 # ==Data Processing==
 dp:
-     # Time stamp encoder
+    # Time stamp encoder
     time_enc:
       add_tid: True
       add_diw: False
