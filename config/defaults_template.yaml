@@ -18,7 +18,9 @@ loss_fn:
     cl:
         lv_up_period: 2500
         task_lv_max: 12
-ckpt_metric: null
+model_ckpt:
+    ckpt_metric: null
+    ckpt_mode: null
 
 # ==DataLoader==
 dataloader:

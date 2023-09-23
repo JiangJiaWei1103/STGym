@@ -10,6 +10,7 @@ inherited from `BaseTrainer`.
 """
 import gc
 from logging import Logger
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
@@ -58,6 +59,7 @@ class MainTrainer(BaseTrainer):
         loss_fn: _Loss,
         optimizer: Optimizer,
         lr_skd: Union[_LRScheduler, lr_scheduler.ReduceLROnPlateau],
+        ckpt_path: Union[Path, str],
         es: EarlyStopping,
         evaluator: Evaluator,
         scaler: Union[MaxScaler, StandardScaler],
@@ -72,6 +74,7 @@ class MainTrainer(BaseTrainer):
             loss_fn,
             optimizer,
             lr_skd,
+            ckpt_path,
             es,
             evaluator,
             use_wandb,
@@ -153,14 +156,12 @@ class MainTrainer(BaseTrainer):
         self,
         return_output: bool = False,
         datatype: str = "val",
-        test: bool = False,
     ) -> Tuple[float, Dict[str, float], Optional[Tensor]]:
         """Run evaluation process for one epoch.
 
         Parameters:
             return_output: whether to return inference result of model
             datatype: type of the dataset to evaluate
-            test: always ignored, exists for compatibility
 
         Return:
             eval_loss_avg: average evaluation loss over batches
