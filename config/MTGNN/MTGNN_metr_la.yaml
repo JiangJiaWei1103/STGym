@@ -8,7 +8,7 @@ model_params:
         # Spatial
         gcn_true: True
         gcn_depth: 2
-        n_series: 207  # For metr_la
+        n_series: 207
         propalpha: 0.05
         # Temporal
         dilation_exponential: 1      # Multi-step: 1, Single-step: 2

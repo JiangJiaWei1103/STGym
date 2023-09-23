@@ -21,6 +21,7 @@ from torch import Tensor
 from metadata import N_DAYS_IN_WEEK, N_SERIES, MTSFBerks, TrafBerks
 from paths import RAW_DATA_PATH
 from utils.common import asym_norm, calculate_random_walk_matrix, calculate_scaled_laplacian, sym_norm
+from utils.common import binary, calculat_binary_scaled_laplacian
 from utils.scaler import MaxScaler, MinMaxScaler, StandardScaler
 
 
@@ -209,20 +210,26 @@ class DataProcessor(object):
                     calculate_random_walk_matrix(adj_mat).T,
                     calculate_random_walk_matrix(adj_mat.T).T,
                 ]
+            elif priori_gs_type == "binary":
+                self._priori_adj_mat = [binary(adj_mat)]
+            elif priori_gs_type == "binary_laplacian":
+                self._priori_adj_mat = [calculat_binary_scaled_laplacian(adj_mat)]
             else:
                 raise RuntimeError(f"Priori GS {priori_gs_type} isn't registered.")
     
     def _load_adj_mat(self) -> np.ndarray:
         """Load hand-crafted adjacency matrix.
 
-        Ref: https://github.com/nnzhan/Graph-WaveNet/
+        See https://github.com/nnzhan/Graph-WaveNet/ .
+
+        Return:
+            adj_mat: hand-crafted (pre-defined) adjacency matrix
         """
-        dataset = self.dataset_name
-        adj_mat_file_path = os.path.join(RAW_DATA_PATH, dataset, f"{dataset}_adj.pkl")
+        adj_mat_file_path = os.path.join(RAW_DATA_PATH, self.dataset_name, f"{self.dataset_name}_adj.pkl")
 
         try:
             with open(adj_mat_file_path, "rb") as f:
-                *_, adj_mat = pickle.load(f)
+                adj_mat = pickle.load(f)
         except UnicodeDecodeError as e:
             with open(adj_mat_file_path, "rb") as f:
                 *_, adj_mat = pickle.load(f, encoding="latin1")

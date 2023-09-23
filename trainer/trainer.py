@@ -191,6 +191,7 @@ class MainTrainer(BaseTrainer):
                 x,
                 x_day=x_day,
                 x_week=x_week,
+                ycl=y,
                 tid=tid,
                 diw=diw
             )

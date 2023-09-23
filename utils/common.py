@@ -158,3 +158,24 @@ def calculate_normalized_laplacian(adj: np.ndarray) -> coo_matrix:
     normalized_laplacian = sp.eye(adj.shape[0]) - adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
 
     return normalized_laplacian
+
+def binary(adj_mat: np.ndarray) -> Tensor:
+    adj_mat[adj_mat > 0] = 1
+    adj_mat = torch.tensor(adj_mat)
+
+    return adj_mat
+
+def calculat_binary_scaled_laplacian(adj_mx: np.ndarray, lambda_max: int = 2, undirected: bool = True) -> csr_matrix:
+    adj_mx[adj_mx > 0] = 1
+    if undirected:
+        adj_mx = np.maximum.reduce([adj_mx, adj_mx.T])
+    L = calculate_normalized_laplacian(adj_mx)
+    if lambda_max is None:
+        lambda_max, _ = linalg.eigsh(L, 1, which="LM")
+        lambda_max = lambda_max[0]  # type: ignore
+    L = sp.csr_matrix(L)
+    M, _ = L.shape
+    Identity = sp.identity(M, format="csr", dtype=L.dtype)
+    L = (2 / lambda_max * L) - Identity
+
+    return L.astype(np.float32)
