@@ -21,6 +21,7 @@ from torch import Tensor
 from metadata import N_DAYS_IN_WEEK, N_SERIES, MTSFBerks, TrafBerks
 from paths import RAW_DATA_PATH
 from utils.common import asym_norm, calculate_random_walk_matrix, calculate_scaled_laplacian, sym_norm
+from utils.common import binary, calculat_binary_scaled_laplacian
 from utils.scaler import MaxScaler, MinMaxScaler, StandardScaler
 
 
@@ -194,7 +195,9 @@ class DataProcessor(object):
             adj_mat = self._load_adj_mat()
             assert self.n_series == adj_mat.shape[0], "Shape of the adjacency matrix is wrong."
 
-            if priori_gs_type == "sym_norm":
+            if priori_gs_type == "original":
+                self._priori_adj_mat = [torch.tensor(adj_mat)]
+            elif priori_gs_type == "sym_norm":
                 self._priori_adj_mat = [sym_norm(adj_mat)]
             elif priori_gs_type == "transition":
                 self._priori_adj_mat = [asym_norm(adj_mat)]
@@ -209,6 +212,10 @@ class DataProcessor(object):
                     calculate_random_walk_matrix(adj_mat).T,
                     calculate_random_walk_matrix(adj_mat.T).T,
                 ]
+            elif priori_gs_type == "binary":
+                self._priori_adj_mat = [binary(adj_mat)]
+            elif priori_gs_type == "binary_laplacian":
+                self._priori_adj_mat = [calculat_binary_scaled_laplacian(adj_mat)]
             else:
                 raise RuntimeError(f"Priori GS {priori_gs_type} isn't registered.")
     
