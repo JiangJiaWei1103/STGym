@@ -63,18 +63,16 @@ class Experiment(object):
 
         # Configure the experiment
         if not infer:
-            self.dp_cfg = setup_dp(args.debug)
+            self.dp_cfg = setup_dp()
             self.model_cfg = setup_model(args.model_name)
-            self.proc_cfg = setup_proc(debug=args.debug)
+            self.proc_cfg = setup_proc()
             self._parse_model_cfg()
             self._agg_cfg()
         else:
             self._evoke_cfg()
 
         # Setup experiment logger
-        if args.debug:
-            assert not args.use_wandb, "For debugging, please disable `--use-wandb` arg."
-        elif args.use_wandb:
+        if args.use_wandb:
             assert args.project_name is not None, "Please specify project name of wandb."
             self.exp_supr = wandb.init(
                 project=args.project_name,
@@ -86,7 +84,6 @@ class Experiment(object):
         self.logger = Logger(logging_file=os.path.join(self.exp_dump_path, log_file)).get_logger()
 
     def __enter__(self) -> Experiment:
-        # self._run()
         self._log_exp_metadata()
         if self.args.use_wandb:
             self.exp_supr.finish()
