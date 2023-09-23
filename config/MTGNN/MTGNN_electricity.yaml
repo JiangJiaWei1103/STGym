@@ -2,18 +2,18 @@
 model_params:
     # Spatial/Temporal Convolution Module
     st_params:
-        layers: 3
+        layers: 5
         dropout: 0.3
-        layer_norm_affline: True 
+        layer_norm_affline: False 
         # Spatial
         gcn_true: True
         gcn_depth: 2
-        n_series: 207  # For metr_la
+        n_series: 321
         propalpha: 0.05
         # Temporal
-        dilation_exponential: 1      # Multi-step: 1, Single-step: 2
+        dilation_exponential: 2      # Multi-step: 1, Single-step: 2
         kernel_set: [2, 3, 6, 7]
-        t_window: 12
+        t_window: 168
     # Graph Learning Layer
     gl_params:
         buildA_true: True
@@ -23,11 +23,11 @@ model_params:
         tanhalpha: 3
     # input/output channels
     ch_params:
-        conv_channels: 32
-        residual_channels: 32
-        skip_channels: 64
-        end_channels: 128
-        in_channels: 2
-    out_dim: 12
+        conv_channels: 16
+        residual_channels: 16
+        skip_channels: 32
+        end_channels: 64
+        in_channels: 1
+    out_dim: 1
 
 fit_params:

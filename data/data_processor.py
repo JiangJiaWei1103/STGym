@@ -215,14 +215,16 @@ class DataProcessor(object):
     def _load_adj_mat(self) -> np.ndarray:
         """Load hand-crafted adjacency matrix.
 
-        Ref: https://github.com/nnzhan/Graph-WaveNet/
+        See https://github.com/nnzhan/Graph-WaveNet/ .
+
+        Return:
+            adj_mat: hand-crafted (pre-defined) adjacency matrix
         """
-        dataset = self.dataset_name
-        adj_mat_file_path = os.path.join(RAW_DATA_PATH, dataset, f"{dataset}_adj.pkl")
+        adj_mat_file_path = os.path.join(RAW_DATA_PATH, self.dataset_name, f"{self.dataset_name}_adj.pkl")
 
         try:
             with open(adj_mat_file_path, "rb") as f:
-                *_, adj_mat = pickle.load(f)
+                adj_mat = pickle.load(f)
         except UnicodeDecodeError as e:
             with open(adj_mat_file_path, "rb") as f:
                 *_, adj_mat = pickle.load(f, encoding="latin1")

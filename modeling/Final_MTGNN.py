@@ -152,20 +152,9 @@ class MTGNN(nn.Module):
                                    out_channels = skip_channels, 
                                    kernel_size = (1, 1),
                                    bias = True)
-            
-        # self._reset_parameters()
-         
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
     
     def forward(self,
         input: Tensor,
-        tid: Optional[Tensor] = None,
-        diw: Optional[Tensor] = None,
         idx: Optional[Tensor] = None,
         **kwargs: Any,
     ) -> Tuple[Tensor, None, None]:
@@ -174,8 +163,6 @@ class MTGNN(nn.Module):
 
         Parameters:
             x: node feature matrix
-            tid: time in day identifier
-            diw: day in week identifier
 
         Return:
             output: prediction
@@ -183,8 +170,6 @@ class MTGNN(nn.Module):
         Shape:
             x: (B, T, N, C), where B is the batch_size, T is the lookback
                 time window and N is the number of time series
-            tid: (B, )
-            diw: (B, )
             output: (B, out_dim, N)
         """
         input = input.permute(0, 3, 2, 1)   # (B, C, N, T)
@@ -333,15 +318,6 @@ class _MTGNNLayer(nn.Module):
             self.norm = _LayerNormalization(
                 (residual_channels, n_series, receptive_field - rf_size_j + 1),
                 elementwise_affine = layer_norm_affline)
-            
-        # self._reset_parameters()
-
-    def _reset_parameters(self):
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
     
     def forward(
         self,
@@ -416,15 +392,6 @@ class _Linear(nn.Module):
             padding = (0, 0),
             stride = (1, 1),
             bias = add_bias)
-
-        # self._reset_parameters()
-
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
     
     def forward(
         self,
@@ -478,15 +445,6 @@ class _MixProp(nn.Module):
         self.alpha = alpha
 
         self.mlp = _Linear((gcn_depth + 1) * c_in, c_out)
-
-        # self._reset_parameters()
-
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
 
     def forward(
         self,
@@ -560,15 +518,6 @@ class _DilatedInception(nn.Module):
                     c_out,
                     kernel_size = (1, kernel_size),
                     dilation = (1, dilated_factor)))
-        
-        # self._reset_parameters()
-    
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
 
     def forward(
         self,
@@ -638,15 +587,6 @@ class _GraphLearning(nn.Module):
             self.embedding2 = nn.Embedding(self.num_nodes, embedding_dim)
             self.linear1 = nn.Linear(embedding_dim, embedding_dim)
             self.linear2 = nn.Linear(embedding_dim, embedding_dim)
-        
-        # self._reset_parameters()
-
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
     
     def forward(self, idx: Tensor) -> Tensor:
         """

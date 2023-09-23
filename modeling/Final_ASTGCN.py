@@ -2,7 +2,7 @@
 ASTGCN framework.
 
 Reference: 
-https://github.com/guoshnBJTU/ASTGCN-r-pytorch/tree/master
+https://github.com/guoshnBJTU/ASTGCN-r-pytorch
 
 Author: ChunWei Shen
 """

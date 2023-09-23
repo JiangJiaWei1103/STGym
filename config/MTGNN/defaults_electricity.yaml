@@ -2,11 +2,11 @@
 # ==Training==
 seed: 168
 device: 'cuda:0'
-epochs: 100
+epochs: 30
 loss_fn:
     # Name of the loss criterion, the choices are as follows:
     #    {'l1', 'l2', 'mtk'}
-    name: 'ml1'
+    name: 'l1'
     # Multitask coordination
     mtk:
         # Supervised task
@@ -15,14 +15,14 @@ loss_fn:
         #ae_recons: 0
         #vq: 0
     rescale: True
-    cl:
-        lv_up_period: 2500
-        task_lv_max: 12
+    cl: null
+        # lv_up_period: 2500
+        # task_lv_max: 12
 ckpt_metric: null
 
 # ==DataLoader==
 dataloader:
-    batch_size: 64
+    batch_size: 4
     shuffle: True
     num_workers: 4
 
@@ -32,9 +32,9 @@ solver:
     optimizer:
         name: adam
         # Learning rate
-        lr: 0.001
+        lr: 0.0001
         # Weight decay, default=1e-2 for AdamW
-        weight_decay: 0.0001
+        weight_decay: 0.00001
         # ==Ada* series==
         # Term added to the denominator to improve numerical stability
         eps: 1e-8
@@ -74,7 +74,7 @@ solver:
 
 # ==Early Stopping==
 es:
-    patience: 100
+    patience: 30
     mode: 'min'
 
 # ==Evaluator==
@@ -84,9 +84,9 @@ evaluator:
     # For single-step
     #eval_metrics: ['rrse', 'corr']
     # For multi-step
-    eval_metrics: ['mmae', 'mrmse', 'mmape']
+    eval_metrics: ['rrse', 'corr']
     # Specify cutoff in multi-horizon scenario
-    horiz_cuts: [3, 6, 12]
+    horiz_cuts: null
 
 # =Misc=
 adj_reg:
