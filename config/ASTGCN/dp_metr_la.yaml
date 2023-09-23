@@ -19,7 +19,7 @@ dp:
 
     # Priori graph structure
     priori_gs:
-        type: laplacian
+        type: binary_laplacian #laplacian
         k: null
 
     # Auxiliary data
