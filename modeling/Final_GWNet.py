@@ -66,6 +66,7 @@ class GWNet(nn.Module):
 
         self.gwnet_layers = nn.ModuleList()
 
+        # linear layer for input transform
         self.start_conv = nn.Conv2d(
             in_channels = in_channels,
             out_channels = residual_channels,
@@ -82,6 +83,7 @@ class GWNet(nn.Module):
         if self.supports is not None:
             self.supports_len += len(self.supports)
         
+        # Self Adaptive adjacency matrix
         if not randomadj:
             adaptive_init = self.supports[0]
         if self.gcn_true and self.addaptadj:
@@ -90,6 +92,7 @@ class GWNet(nn.Module):
                 self.supports = []
             self.supports_len +=1
 
+        # Graph wavenet layers
         for b in range(self.blocks):
             additional_scope = kernel_size - 1
             new_dilation = 1
@@ -110,6 +113,7 @@ class GWNet(nn.Module):
                 receptive_field += additional_scope
                 additional_scope *= dilation_exponential
         
+        # linear layer for the output of GWNet layer
         self.end_conv_1 = nn.Conv2d(
             in_channels=skip_channels,
             out_channels=end_channels,
@@ -123,15 +127,6 @@ class GWNet(nn.Module):
             bias=True)
 
         self.receptive_field = receptive_field
-
-        # self._reset_parameters()
-
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
 
     def forward(self,
         input: Tensor,
@@ -158,9 +153,11 @@ class GWNet(nn.Module):
         else:
             x = input
 
+        # linear layer for input transform
         x = self.start_conv(x)
         skip = 0
 
+        # Self Adaptive adjacency matrix
         new_supports = None
         if self.gcn_true and self.addaptadj and self.supports is not None:
             adp = self.sa().to(x.device)
@@ -239,6 +236,7 @@ class _GWNetLayer(nn.Module):
         
         self.bn = nn.BatchNorm2d(residual_channels)
 
+        # Graph convolution
         if self.gcn_true:
             self.gconv = _GCN(
                 dilation_channels,
@@ -246,15 +244,6 @@ class _GWNetLayer(nn.Module):
                 dropout,
                 supports_len,
                 gcn_depth)
-
-        # self._reset_parameters()
-
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
     
     def forward(
         self,
@@ -328,15 +317,6 @@ class _Linear(nn.Module):
             padding = (0, 0),
             stride = (1, 1),
             bias = add_bias)
-
-        # self._reset_parameters()
-
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
     
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -381,15 +361,6 @@ class _GCN(nn.Module):
         self.mlp = _Linear((gcn_depth * support_len + 1) * c_in, c_out)
         self.dropout = dropout
         self.gcn_depth = gcn_depth
-
-        # self._reset_parameters()
-
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
 
     def forward(
             self,
@@ -449,15 +420,6 @@ class _SelfAdaptive(nn.Module):
             initemb2 = torch.mm(torch.diag(p[:10] ** 0.5), n[:, :10].t())
             self.nodevec1 = nn.Parameter(initemb1, requires_grad=True)
             self.nodevec2 = nn.Parameter(initemb2, requires_grad=True)
-        
-        # self._reset_parameters()
-
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
-            else:
-                nn.init.uniform_(p)
     
     def forward(self) -> Tensor:
         """

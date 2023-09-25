@@ -54,6 +54,7 @@ class DCRNN(nn.Module):
         out_channels = self.st_params['out_channels']
         max_diffusion_step = self.st_params['max_diffusion_step']
 
+        # Encoder
         self.encoder = _Encoder(
             input_dim = encoder_input_dim,
             supports = supports,
@@ -62,6 +63,7 @@ class DCRNN(nn.Module):
             n_series = n_series,
             num_layers = num_layers)
         
+        # Decoder
         self.decoder = _Decoder(
             input_dim = decoder_input_dim,
             supports = supports, 

@@ -56,6 +56,7 @@ class STGCN(nn.Module):
         enable_bias = self.st_params['bias']
         droprate = self.st_params['dropout']
 
+        # Spatio-temporal Convolution Block
         modules = []
         for l in range(len(blocks) - 3):
             modules.append(
@@ -73,6 +74,7 @@ class STGCN(nn.Module):
             
         self.st_blocks = nn.Sequential(*modules)
 
+        # output layer
         Ko = t_window - (len(blocks) - 3) * 2 * (Kt - 1)
         self.Ko = Ko
         if self.Ko > 1:
@@ -117,8 +119,10 @@ class STGCN(nn.Module):
         """
 
         x = x.permute(0, 3, 1, 2)       # (B, C, T, N)
+        # Spatio-temporal Convolution Block
         x = self.st_blocks(x)
 
+        # output layer
         if self.Ko > 1:
             x = self.output(x)
         elif self.Ko == 0:

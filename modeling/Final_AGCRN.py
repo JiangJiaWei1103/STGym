@@ -49,10 +49,12 @@ class AGCRN(nn.Module):
 
         self.hidden_dim = rnn_units
 
+        # node-embedding matrix
         self.node_embeddings = nn.Parameter(
             torch.randn(self.n_series, self.embedding_dim),
             requires_grad = True)
 
+        # Adaptive Graph Convolutional Recurrent Network
         self.encoder = _AVWDCRNN(
             self.n_series, 
             in_channels, 
@@ -102,6 +104,7 @@ class AGCRN(nn.Module):
         batch_size = source.shape[0]
         init_state = self.encoder.init_hidden(batch_size)
 
+        # Adaptive Graph Convolutional Recurrent Network
         output, _ = self.encoder(source, init_state, self.node_embeddings)   # (B, T, N, D)
         output = output[:, -1:, :, :]                                        # (B, 1, N, D)
 
@@ -114,7 +117,7 @@ class AGCRN(nn.Module):
 
 class _AVWDCRNN(nn.Module):
     """
-    RNN layers.
+    Adaptive Graph Convolutional Recurrent Network.
 
     Parameters:
         n_series: number of nodes

@@ -53,10 +53,12 @@ class ASTGCN(nn.Module):
         num_of_week = self.st_params['num_of_week']
         n_series = self.st_params['n_series']
         
+        # Chebyshev polynomials for Graph convolution
         cheb_polynomials = [torch.from_numpy(i).type(torch.FloatTensor).to(device) for i in self._cheb_polynomial()]
 
         self.astgcn = nn.ModuleList()
  
+        # ASTGCN submodule for recent data
         self.astgcn.append(
             _ASTGCN_submodule(
                 device,
@@ -71,6 +73,7 @@ class ASTGCN(nn.Module):
                 t_window,
                 n_series))
         
+        # ASTGCN submodule for daily-periodic data
         self.astgcn.append(
             _ASTGCN_submodule(
                 device,
@@ -85,6 +88,7 @@ class ASTGCN(nn.Module):
                 day_window,
                 n_series))
         
+        # ASTGCN submodule for weekly-periodic data
         self.astgcn.append(
             _ASTGCN_submodule(
                 device,
@@ -99,6 +103,7 @@ class ASTGCN(nn.Module):
                 week_window,
                 n_series))
         
+        # Multi-Component Fusion
         self.final_conv = nn.Conv2d(
             in_channels = 3,
             out_channels = 1,
@@ -151,10 +156,14 @@ class ASTGCN(nn.Module):
         if num_x != len(self.astgcn):
             raise ValueError("number of submodule not equals to the number of input")
         
+        # recent data
         output_h = self.astgcn[0](x.permute(0, 2, 3, 1)).unsqueeze(1)
+        # daily-periodic data
         output_d = self.astgcn[1](x_day.permute(0, 2, 3, 1)).unsqueeze(1)
+        # weekly-periodic data
         output_w = self.astgcn[2](x_week.permute(0, 2, 3, 1)).unsqueeze(1)
 
+        # Multi-Component Fusion
         output = torch.cat((output_h, output_d, output_w), dim = 1)    # (B, 3, N, out_dim)
         output = self.final_conv(output).squeeze(1).permute(0 ,2, 1)
 
