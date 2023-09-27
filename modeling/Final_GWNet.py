@@ -128,7 +128,8 @@ class GWNet(nn.Module):
 
         self.receptive_field = receptive_field
 
-    def forward(self,
+    def forward(
+        self,
         input: Tensor,
         **kwargs: Any,
     ) -> Tuple[Tensor, None, None]:
