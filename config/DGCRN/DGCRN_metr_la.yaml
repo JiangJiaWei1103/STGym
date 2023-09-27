@@ -1,0 +1,25 @@
+# Configuration file for model architecture `DGCRN`
+model_params:
+    # Spatial/Temporal pattern extractor
+    st_params:
+        dropout: 0.3
+        list_weight: [0.05, 0.95, 0.95]
+        use_curriculum_learning: True
+        cl_decay_steps: 4000
+        in_channels: 2
+        # Spatial
+        gcn_depth: 2
+        n_series: 207
+        # Temporal
+        rnn_size: 64
+        t_window: 12
+    # Graph Generator
+    gg_params:
+        node_dim: 40
+        middle_dim: 2
+        hyperGNN_dim: 16
+        tanhalpha: 3
+    out_dim: 12
+    device: 'cuda:0'
+
+fit_params:

@@ -1,0 +1,21 @@
+# Configuration file for model architecture `STID`
+model_params:
+    # Spatial/Temporal pattern extractor
+    st_params:
+        num_layer: 3
+        n_series: 207
+        t_window: 12
+        input_dim: 3
+        node_dim: 32
+        embed_dim: 32
+        temp_dim_tid: 32
+        temp_dim_diw: 32
+        if_time_in_day: True
+        if_day_in_week: True
+        if_spatial: True
+        time_of_day_size: 288
+        day_of_week_size: 7
+
+    out_dim: 12
+
+fit_params:

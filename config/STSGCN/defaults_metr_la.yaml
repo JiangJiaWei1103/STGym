@@ -1,0 +1,51 @@
+adj_reg: null
+ckpt_metric: null
+dataloader:
+  batch_size: 32
+  num_workers: 4
+  shuffle: true
+device: cuda:0
+epochs: 100
+es:
+  mode: min
+  patience: 100
+evaluator:
+  eval_metrics:
+  - mmae
+  - mrmse
+  - mmape
+  horiz_cuts:
+  - 3
+  - 6
+  - 12
+loss_fn:
+  cl: null
+  mtk: null
+  name: ml1
+  rescale: true
+seed: 3567960685
+solver:
+  lr_skd:
+    T_max: null
+    eta_min: null
+    factor: 0.5
+    gamma: 0.5
+    milestones:
+    - 50
+    - 80
+    mode: min
+    name: multistep
+    patience: 5
+  optimizer:
+    amsgrad: false
+    beta1: 0.9
+    beta2: 0.999
+    dampening: null
+    eps: 1e-8
+    lr: 0.001
+    lr_decay: null
+    momentum: null
+    name: adam
+    nesterov: null
+    rho: null
+    weight_decay: 0.0001
