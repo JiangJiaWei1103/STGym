@@ -66,8 +66,8 @@ class ModelCheckpoint(object):
             mid = "loss" if self.ckpt_metric is None else self.ckpt_metric
             self._save_ckpt(model, mid)
 
-            if last_epoch:
-                self._save_ckpt(model, "last")
+        if last_epoch:
+            self._save_ckpt(model, "last")
 
     def save_ckpt(self, model: Module, mid: Optional[str] = None) -> None:
         """Save the checkpoint.
