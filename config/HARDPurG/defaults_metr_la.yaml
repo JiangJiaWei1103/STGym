@@ -15,8 +15,12 @@ loss_fn:
         #ae_recons: 0
         #vq: 0
     rescale: True
-    cl: null
-ckpt_metric: null
+    cl:
+        lv_up_period: 2500
+        task_lv_max: 12
+model_ckpt:
+    ckpt_metric: null
+    ckpt_mode: null
 
 # ==DataLoader==
 dataloader:
@@ -58,10 +62,10 @@ solver:
 
     # ==Learning rate scheduler==
     lr_skd:
-        name: multistep
-        milestones: [50, 80]
+        name: plateau
+        milestones: null
         # Multiplicative factor of learning rate decay
-        gamma: 0.5
+        gamma: null
 
         T_max: null
         eta_min: null
@@ -72,7 +76,7 @@ solver:
 
 # ==Early Stopping==
 es:
-    patience: 30
+    patience: 10
     mode: 'min'
 
 # ==Evaluator==
