@@ -16,7 +16,9 @@ loss_fn:
         #vq: 0
     rescale: True
     cl: null
-ckpt_metric: null
+model_ckpt:
+    ckpt_metric: null
+    ckpt_mode: null
 
 # ==DataLoader==
 dataloader:
