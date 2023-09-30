@@ -8,8 +8,10 @@ optional.
 
 * [ ] Add wandb tracker via public method in `Experiment` (e.g.,
     `add_wnb_entry` method).
+* [ ] Feed priori graph structure when calling model `forward`.
 """
 import gc
+import os
 import warnings
 from argparse import Namespace
 
@@ -114,6 +116,7 @@ def main(args: Namespace) -> None:
                 "loss_fn": loss_fn,
                 "optimizer": optimizer,
                 "lr_skd": lr_skd,
+                "ckpt_path": os.path.join(exp.exp_dump_path, "models"),
                 "es": es,
                 "evaluator": evaluator,
                 "train_loader": train_loader,
@@ -124,7 +127,7 @@ def main(args: Namespace) -> None:
             trainer = MainTrainer(**trainer_cfg)
 
             # Run main training and evaluation for one fold
-            best_model, best_preds = trainer.train_eval(i)
+            trainer.train_eval(i)
 
             # Run evaluation on unseen test set
             if args.eval_on_test:
@@ -136,13 +139,12 @@ def main(args: Namespace) -> None:
                     **exp.proc_cfg["dataloader"],
                     **exp.dp_cfg["dataset"],
                 )
-                y_pred_test = trainer.test(i, test_loader)
+                _ = trainer.test(i, test_loader)
 
             trainer.profiler.summarize(log_wnb=True if args.use_wandb else False)
 
             # Dump output objects
             exp.dump_trafo(scaler, f"fold{i}")
-            exp.dump_model(best_model, f"fold{i}")
 
             # Free mem.
             del (

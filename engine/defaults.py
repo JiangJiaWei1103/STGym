@@ -57,12 +57,6 @@ class TrainEvalArgParser(BaseArgParser):
             help="whether to evaluate on test set",
         )
         self.argparser.add_argument(
-            "--debug",
-            type=self._str2bool,
-            default=False,
-            help="if True, debug mode is on",
-        )
-        self.argparser.add_argument(
             "--use-wandb",
             type=self._str2bool,
             default=True,

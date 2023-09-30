@@ -43,7 +43,7 @@ class DataProcessor(object):
     _data_holdout: np.ndarray
     _data_test: np.ndarray
 
-    # The priori graph structure is optionally provided.
+    # The priori graph structure is optionally provided
     _priori_adj_mat: Optional[List[Union[Tensor, coo_matrix, csr_matrix]]] = None
     # The auxiliary data is optionally provided.
     _aux_data: Optional[List[np.ndarray]] = None

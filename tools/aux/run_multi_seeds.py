@@ -73,7 +73,7 @@ class MultiSeedProcWrapper(object):
 
     def _seed_proc(self, seed: int) -> None:
         """Seed the process."""
-        cfg_file = f"{args.model_name}/defaults_{args.dataset_name}.yaml" if not args.debug else "defaults_debug.yaml"
+        cfg_file = f"{args.model_name}/defaults_{args.dataset_name}.yaml" if not self.debug else "defaults_debug.yaml"
         with open(os.path.join(CONFIG_PATH, cfg_file), "r") as f:
             proc_cfg = yaml.full_load(f)
             proc_cfg["seed"] = seed
