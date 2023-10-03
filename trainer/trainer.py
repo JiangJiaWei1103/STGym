@@ -59,12 +59,12 @@ class MainTrainer(BaseTrainer):
         loss_fn: _Loss,
         optimizer: Optimizer,
         lr_skd: Union[_LRScheduler, lr_scheduler.ReduceLROnPlateau],
-        ckpt_path: Union[Path, str],
         es: EarlyStopping,
         evaluator: Evaluator,
-        scaler: Union[MaxScaler, StandardScaler],
+        ckpt_path: Union[Path, str],
         train_loader: DataLoader,
         eval_loader: Optional[DataLoader] = None,
+        scaler: Optional[Union[MaxScaler, StandardScaler]] = None,
         use_wandb: bool = True,
     ):
         super(MainTrainer, self).__init__(
@@ -106,14 +106,10 @@ class MainTrainer(BaseTrainer):
             # Retrieve batched raw data
             x = batch_data["X"].to(self.device)
             y = batch_data["y"].to(self.device)
-            tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
-            diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
             # Forward pass and derive loss
             output, *_ = self.model(
                 x,
-                tid=tid,
-                diw=diw,
                 ycl=y,
                 batches_seen=self._iter,
                 task_level=None if self._cl is None else self._cl.get_task_lv(),
@@ -141,6 +137,9 @@ class MainTrainer(BaseTrainer):
             self.optimizer.step()
             self._iter += 1
             train_loss_total += loss.item()
+
+            if self.step_per_batch:
+                self.lr_skd.step()
 
             # Free mem.
             del x, y, output
@@ -178,11 +177,9 @@ class MainTrainer(BaseTrainer):
             # Retrieve batched raw data
             x = batch_data["X"].to(self.device)
             y = batch_data["y"].to(self.device)
-            tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
-            diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
             # Forward pass
-            output, *_ = self.model(x, tid=tid, diw=diw)
+            output, *_ = self.model(x, ycl=y)
 
             # Derive loss
             if y.dim() == 4:

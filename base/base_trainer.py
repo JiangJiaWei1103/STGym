@@ -34,6 +34,7 @@ class BaseTrainer:
         loss_fn: loss criterion
         optimizer: optimization algorithm
         lr_skd: learning rate scheduler
+        ckpt_path: path to save model checkpoints
         es: early stopping tracker
         evaluator: task-specific evaluator
         use_wandb: if True, training and evaluation processes are
@@ -70,10 +71,11 @@ class BaseTrainer:
 
         self.device = proc_cfg["device"]
         self.epochs = proc_cfg["epochs"]
+        # If True, learning rate scheduler steps per batches
+        self.step_per_batch = proc_cfg["solver"]["lr_skd"]["step_per_batch"]
 
         # Model checkpoint
         self.model_ckpt = ModelCheckpoint(ckpt_path, **proc_cfg["model_ckpt"])
-        self.mid = "loss" if proc_cfg["model_ckpt"]["ckpt_metric"] is None else proc_cfg["model_ckpt"]["ckpt_metric"]
 
         self._iter = 0
         self._track_best_model = True  # (Deprecated)
@@ -95,7 +97,7 @@ class BaseTrainer:
             val_loss, val_result, _ = self._eval_epoch(datatype="val")
 
             # Adjust learning rate
-            if self.lr_skd is not None:
+            if not self.step_per_batch and self.lr_skd is not None:
                 if isinstance(self.lr_skd, lr_scheduler.ReduceLROnPlateau):
                     self.lr_skd.step(val_loss)
                 else:
@@ -119,7 +121,7 @@ class BaseTrainer:
             wandb.log({"best_epoch": self.model_ckpt.best_epoch + 1})
 
         # Run final evaluation
-        final_prf_report, y_preds = self._eval_with_best_ckpt()
+        final_prf_report, y_preds = self._run_final_eval()
         self._log_best_prf(final_prf_report)
 
         return best_model, y_preds
@@ -220,7 +222,7 @@ class BaseTrainer:
 
             wandb.log(log_dict)
 
-    def _eval_with_best_ckpt(self) -> Tuple[Dict[str, Dict[str, float]], Dict[str, Tensor]]:
+    def _run_final_eval(self) -> Tuple[Dict[str, Dict[str, float]], Dict[str, Tensor]]:
         """Run final evaluation process with the best checkpoint.
 
         Return:
@@ -228,14 +230,13 @@ class BaseTrainer:
             y_preds: inference results on different datasets
         """
         # Load the best model checkpoint
-        self.model = self.model_ckpt.load_best_ckpt(self.model, self.device, self.mid)
+        self.model = self.model_ckpt.load_best_ckpt(self.model, self.device)
 
         # Reconstruct dataloaders
         self._disable_shuffle()
         val_loader = self.eval_loader
 
-        final_prf_report = {}
-        y_preds = {}
+        final_prf_report, y_preds = {}, {}
         for datatype, dataloader in {
             "train": self.train_loader,
             "val": val_loader,

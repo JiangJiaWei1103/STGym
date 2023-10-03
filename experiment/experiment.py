@@ -246,6 +246,9 @@ class Experiment(object):
             else:
                 print(f"{self.exp_dump_path} already exists!")
 
+        # Define paths for quick access
+        self.ckpt_path = os.path.join(self.exp_dump_path, "models")  # Model checkpointing
+
     def _run(self) -> None:
         pass
 

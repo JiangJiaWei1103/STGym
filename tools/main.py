@@ -9,9 +9,10 @@ optional.
 * [ ] Add wandb tracker via public method in `Experiment` (e.g.,
     `add_wnb_entry` method).
 * [ ] Feed priori graph structure when calling model `forward`.
+* [ ] Derive `num_training_steps` elsewhere.
 """
 import gc
-import os
+import math
 import warnings
 from argparse import Namespace
 
@@ -92,8 +93,11 @@ def main(args: Namespace) -> None:
             loss_fn = build_criterion(**exp.proc_cfg["loss_fn"])
 
             # Build solvers
-            optimizer = build_optimizer(model, **exp.proc_cfg)
-            lr_skd = build_lr_scheduler(optimizer, **exp.proc_cfg)
+            optimizer = build_optimizer(model, **exp.proc_cfg["solver"]["optimizer"])
+            num_training_steps = (
+                math.ceil(len(train_loader) / exp.proc_cfg["dataloader"]["batch_size"]) * exp.proc_cfg["epochs"]
+            )
+            lr_skd = build_lr_scheduler(optimizer, num_training_steps, **exp.proc_cfg["solver"]["lr_skd"])
 
             # Build early stopping tracker
             if exp.proc_cfg["es"]["patience"] != 0:
@@ -113,9 +117,9 @@ def main(args: Namespace) -> None:
                 "loss_fn": loss_fn,
                 "optimizer": optimizer,
                 "lr_skd": lr_skd,
-                "ckpt_path": os.path.join(exp.exp_dump_path, "models"),
                 "es": es,
                 "evaluator": evaluator,
+                "ckpt_path": exp.ckpt_path,
                 "train_loader": train_loader,
                 "eval_loader": val_loader,
                 "scaler": scaler,

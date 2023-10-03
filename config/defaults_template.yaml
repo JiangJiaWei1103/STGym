@@ -21,6 +21,7 @@ loss_fn:
 model_ckpt:
     ckpt_metric: null
     ckpt_mode: null
+    best_ckpt_mid: last
 
 # ==DataLoader==
 dataloader:
@@ -62,7 +63,7 @@ solver:
 
     # ==Learning rate scheduler==
     lr_skd:
-        name: plateau
+        name: cos
         milestones: null
         # Multiplicative factor of learning rate decay
         gamma: null
@@ -73,6 +74,9 @@ solver:
         mode: min
         factor: 0.5
         patience: 5
+
+        # If True, step scheduler per iteration
+        step_per_batch: True
 
 # ==Early Stopping==
 es:
