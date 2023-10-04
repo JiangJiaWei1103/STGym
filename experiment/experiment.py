@@ -20,6 +20,8 @@ import torch
 import yaml
 from sklearn.base import BaseEstimator
 from torch.nn import Module
+from wandb.sdk.lib import RunDisabled
+from wandb.sdk.wandb_run import Run
 
 import wandb
 from config.config import setup_dp, setup_model, setup_proc
@@ -194,6 +196,20 @@ class Experiment(object):
         """
         self._cv_score = cv_score
 
+    def add_wnb_run(self, job_type: Optional[str] = None, name: Optional[str] = None) -> Union[Run, RunDisabled, None]:
+        """Initialize an wandb run for experiment tracking.
+
+        Parameters:
+            job_type: type of run
+            name: name of run
+
+        Return:
+            run: wandb run to track the current experiment
+        """
+        run = wandb.init(project=self.args.project_name, group=self.exp_id, job_type=job_type, name=name)
+
+        return run
+
     def _parse_model_cfg(self) -> None:
         """Configure model parameters and parameters passed to `fit`
         method if they're provided.
@@ -259,16 +275,16 @@ class Experiment(object):
 
     def _halt(self) -> None:
         if self.args.use_wandb:
-            dump_entry = wandb.init(project=self.args.project_name, group=self.exp_id, job_type="dumping")
+            dump_run = self.add_wnb_run(job_type="dumping")
 
             # Log final CV score if exists
             if self._cv_score is not None:
-                dump_entry.log({"cv_score": self._cv_score})
+                dump_run.log({"cv_score": self._cv_score})
 
             # Push artifacts to remote
             artif = wandb.Artifact(name=self.args.model_name.upper(), type="output")
             artif.add_dir(self.exp_dump_path)
-            dump_entry.log_artifact(artif)
-            dump_entry.finish()
+            dump_run.log_artifact(artif)
+            dump_run.finish()
 
         self.log(f"=====End of Experiment {self.exp_id}=====")

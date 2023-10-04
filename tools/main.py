@@ -7,7 +7,7 @@ specified CV scheme. Moreover, evaluation on unseen (test) data is
 optional.
 
 * [ ] Add wandb tracker via public method in `Experiment` (e.g.,
-    `add_wnb_entry` method).
+    `add_wnb_run` method).
 * [ ] Feed priori graph structure when calling model `forward`.
 * [ ] Derive `num_training_steps` elsewhere.
 """
@@ -16,7 +16,6 @@ import math
 import warnings
 from argparse import Namespace
 
-import wandb
 from base.base_trainer import BaseTrainer
 from criterion.build import build_criterion
 from cv.build import build_cv
@@ -57,16 +56,11 @@ def main(args: Namespace) -> None:
 
         # Run CV
         cv = build_cv(**exp.dp_cfg["cv"])
-        for i, (tr_idx, val_idx) in enumerate(cv.split(X=data)):
+        for fold, (tr_idx, val_idx) in enumerate(cv.split(X=data)):
             # Configure sub-entry for tracking current fold
             if args.use_wandb:
-                sub_entry = wandb.init(
-                    project=args.project_name,
-                    group=exp.exp_id,
-                    job_type="train_eval",
-                    name=f"fold{i}",
-                )
-            exp.log(f"\n== Train and Eval Process - Fold{i} ==")
+                tr_eval_run = exp.add_wnb_run(job_type="train_eval", name=f"fold{fold}")
+            exp.log(f"\n== Train and Eval Process - Fold{fold} ==")
 
             # Build dataloaders
             data_tr, data_val = data[tr_idx, ...], data[val_idx, ...]
@@ -86,8 +80,8 @@ def main(args: Namespace) -> None:
             model = build_model(args.model_name, model_params)
             model.to(exp.proc_cfg["device"])
             if args.use_wandb:
-                wandb.log({"model": {"n_params": count_params(model)}})
-                wandb.watch(model, log="all", log_graph=True)
+                tr_eval_run.log({"model": {"n_params": count_params(model)}})
+                tr_eval_run.watch(model, log="all", log_graph=True)
 
             # Build criterion
             loss_fn = build_criterion(**exp.proc_cfg["loss_fn"])
@@ -128,7 +122,7 @@ def main(args: Namespace) -> None:
             trainer = MainTrainer(**trainer_cfg)
 
             # Run main training and evaluation for one fold
-            trainer.train_eval(i)
+            trainer.train_eval(fold)
 
             # Run evaluation on unseen test set
             if args.eval_on_test:
@@ -140,12 +134,12 @@ def main(args: Namespace) -> None:
                     **exp.proc_cfg["dataloader"],
                     **exp.dp_cfg["dataset"],
                 )
-                _ = trainer.test(i, test_loader)
+                _ = trainer.test(fold, test_loader)
 
             trainer.profiler.summarize(log_wnb=True if args.use_wandb else False)
 
             # Dump output objects
-            exp.dump_trafo(scaler, f"fold{i}")
+            exp.dump_trafo(scaler, f"fold{fold}")
 
             # Free mem.
             del (
@@ -163,7 +157,7 @@ def main(args: Namespace) -> None:
             _ = gc.collect()
 
             if args.use_wandb:
-                sub_entry.finish()
+                tr_eval_run.finish()
 
 
 if __name__ == "__main__":
