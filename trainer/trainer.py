@@ -83,6 +83,8 @@ class MainTrainer(BaseTrainer):
         self.eval_loader = eval_loader if eval_loader else train_loader
         self.scaler = scaler
         self.rescale = proc_cfg["loss_fn"]["rescale"]
+        self.custom = proc_cfg["loss_fn"]["custom"]
+        self.clip_grad_norm = proc_cfg["clip_grad_norm"]
 
         # Curriculum learning
         if self.proc_cfg["loss_fn"]["cl"] is not None:
@@ -131,7 +133,9 @@ class MainTrainer(BaseTrainer):
             # Derive loss
             if y.dim() == 4:
                 y = y[..., 0]
-            if self._cl is not None:
+            if self.custom:
+                loss = self.model.train_loss(output, y, *_, self.scaler, self.loss_fn)
+            elif self._cl is not None:
                 task_lv = self._cl.get_task_lv()
                 loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
                 self._cl.step()
@@ -140,7 +144,8 @@ class MainTrainer(BaseTrainer):
 
             # Backpropagation
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+            if self.clip_grad_norm is not None:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.clip_grad_norm)
 
             self.optimizer.step()
             self._iter += 1
@@ -200,7 +205,15 @@ class MainTrainer(BaseTrainer):
             # Derive loss
             if y.dim() == 4:
                 y = y[..., 0]
-            if self.rescale:
+            if self.custom:
+                loss, output, y = self.model.eval_loss(
+                    output,
+                    y,
+                    *_,
+                    self.scaler,
+                    self.loss_fn
+                )
+            elif self.rescale:
                 loss = self.loss_fn(
                     self.scaler.inverse_transform(output),
                     self.scaler.inverse_transform(y),

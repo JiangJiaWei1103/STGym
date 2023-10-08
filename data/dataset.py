@@ -63,6 +63,12 @@ class BenchmarkDataset(Dataset):
         data: processed data
         t_window: lookback time window, denoted by T
         horizon: predicting horizon, denoted by Q
+        n_tids: number of time slots in one day
+        multi_step: whether to return multi-step y
+        day_window: lookback time window for day
+        week_window: lookback time window for week
+        num_of_day: lookback day period
+        num_of_week: lookback week period
     """
 
     def __init__(
@@ -71,6 +77,7 @@ class BenchmarkDataset(Dataset):
         t_window: int,
         horizon: int,
         n_tids: Optional[int] = None,
+        multi_step: bool = False,
         day_window: Optional[int] = None,
         week_window: Optional[int] = None,
         num_of_day: Optional[int] = None,
@@ -78,6 +85,7 @@ class BenchmarkDataset(Dataset):
         **kwargs: Any,
     ):
         self.data = data
+        self.multi_step = multi_step
         self.ts_attr = _TimeSeriesAttr(
             len(data),
             data.shape[1],
@@ -114,9 +122,14 @@ class BenchmarkDataset(Dataset):
         X = []
         y = []
 
-        for i in range(self.ts_attr.n_samples):
-            X.append(self.data[i : i + self.ts_attr.P, ...])
-            y.append(self.data[i + self.ts_attr.offset, :, 0])
+        if self.multi_step: # for SCINet
+            for i in range(self.ts_attr.n_samples):
+                X.append(self.data[i : i + self.ts_attr.P, ...])
+                y.append(self.data[i + self.ts_attr.P : i + self.ts_attr.offset + 1, :, 0])
+        else:
+            for i in range(self.ts_attr.n_samples):
+                X.append(self.data[i : i + self.ts_attr.P, ...])
+                y.append(self.data[i + self.ts_attr.offset, :, 0])
 
         self.X = np.stack(X)  # (M, P, N, C)
         self.y = np.stack(y)  # (M, N), Q = 1 for single-horizon
