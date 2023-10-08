@@ -203,7 +203,7 @@ class MTGNN(nn.Module):
         x = F.relu(skip)
         x = F.relu(self.end_conv_1(x))
         x = self.end_conv_2(x)
-        output = torch.squeeze(x)
+        output = x.squeeze(-1).squeeze(1)
 
         return output, None, None
 

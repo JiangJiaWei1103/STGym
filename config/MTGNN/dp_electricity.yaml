@@ -15,7 +15,7 @@ dp:
     holdout_ratio: 0.2
 
     # Scaling
-    scaling: minmax  # standard
+    scaling: max
 
     # Priori graph structure
     priori_gs:
