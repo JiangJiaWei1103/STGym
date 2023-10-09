@@ -11,7 +11,7 @@ inherited from `BaseTrainer`.
 import gc
 from logging import Logger
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -64,6 +64,7 @@ class MainTrainer(BaseTrainer):
         ckpt_path: Union[Path, str],
         train_loader: DataLoader,
         eval_loader: Optional[DataLoader] = None,
+        priori_gs: Optional[List[Tensor]] = None,
         scaler: Optional[Union[MaxScaler, StandardScaler]] = None,
         use_wandb: bool = True,
     ):
@@ -81,6 +82,7 @@ class MainTrainer(BaseTrainer):
         )
         self.train_loader = train_loader
         self.eval_loader = eval_loader if eval_loader else train_loader
+        self.priori_gs = None if priori_gs is None else [A.to(self.device) for A in priori_gs]
         self.scaler = scaler
         self.rescale = proc_cfg["loss_fn"]["rescale"]
 
@@ -108,12 +110,7 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
 
             # Forward pass and derive loss
-            output, *_ = self.model(
-                x,
-                ycl=y,
-                batches_seen=self._iter,
-                task_level=None if self._cl is None else self._cl.get_task_lv(),
-            )
+            output, *_ = self.model(x, self.priori_gs, ycl=y, iteration=self._iter)
 
             # Inverse transform to the original scale
             if self.rescale:
@@ -179,7 +176,7 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
 
             # Forward pass
-            output, *_ = self.model(x, ycl=y)
+            output, *_ = self.model(x, self.priori_gs)
 
             # Derive loss
             if y.dim() == 4:

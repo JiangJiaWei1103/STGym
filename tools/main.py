@@ -75,8 +75,6 @@ def main(args: Namespace) -> None:
 
             # Build model
             model_params = exp.model_params
-            if priori_gs is not None:
-                model_params["priori_gs"] = priori_gs
             model = build_model(args.model_name, model_params)
             model.to(exp.proc_cfg["device"])
             if args.use_wandb:
@@ -116,6 +114,7 @@ def main(args: Namespace) -> None:
                 "ckpt_path": exp.ckpt_path,
                 "train_loader": train_loader,
                 "eval_loader": val_loader,
+                "priori_gs": priori_gs,
                 "scaler": scaler,
                 "use_wandb": args.use_wandb,
             }

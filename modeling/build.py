@@ -14,6 +14,7 @@ from typing import Any, Dict
 from torch.nn import Module
 
 from .Final import HARDPurG
+from .sotas.DCRNN import DCRNN
 
 
 def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
@@ -29,6 +30,8 @@ def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
     model: Module
     if model_name == "HARDPurG":
         model = HARDPurG(**model_cfg)
+    elif model_name == "DCRNN":
+        model = DCRNN(**model_cfg)
     else:
         raise RuntimeError(f"{model_name} isn't registered.")
 

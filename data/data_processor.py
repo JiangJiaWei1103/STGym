@@ -201,6 +201,17 @@ class DataProcessor(object):
             else:
                 raise RuntimeError(f"Priori GS {priori_gs_type} isn't registered.")
 
+        # ===
+        # To torch sparse?
+        def _build_sparse_matrix(L):  # type: ignore
+            shape = L.shape
+            i = torch.LongTensor(np.vstack((L.row, L.col)).astype(int))
+            v = torch.FloatTensor(L.data)
+            return torch.sparse.FloatTensor(i, v, torch.Size(shape))
+
+        self._priori_adj_mat = [_build_sparse_matrix(A) for A in self._priori_adj_mat]
+        # ===
+
     def _load_adj_mat(self) -> np.ndarray:
         """Load hand-crafted adjacency matrix.
 
