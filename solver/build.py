@@ -12,9 +12,10 @@ from torch import optim
 from torch.nn import Module
 from torch.optim import Optimizer, lr_scheduler
 from torch.optim.lr_scheduler import _LRScheduler
+from transformers import get_cosine_schedule_with_warmup
 
 
-def build_optimizer(model: Module, **proc_cfg: Any) -> Optional[Optimizer]:
+def build_optimizer(model: Module, **optim_cfg: Any) -> Optional[Optimizer]:
     """Build and return an optimizer based on configuration.
 
     Ref:
@@ -25,13 +26,12 @@ def build_optimizer(model: Module, **proc_cfg: Any) -> Optional[Optimizer]:
 
     Parameters:
         model: model instance
-        proc_cfg: hyperparameters for training and evaluation processes
+        optim_cfg: hyperparameters of the optimizer
 
     Return:
         optimizer: optimization algorithm
     """
     # Setup configuration
-    optim_cfg = proc_cfg["solver"]["optimizer"]
     optim_name = optim_cfg["name"]
     base_lr = float(optim_cfg["lr"])
     weight_decay = float(optim_cfg["weight_decay"])
@@ -103,7 +103,7 @@ def build_optimizer(model: Module, **proc_cfg: Any) -> Optional[Optimizer]:
 
 
 def build_lr_scheduler(
-    optimizer: Optimizer, **proc_cfg: Any
+    optimizer: Optimizer, num_training_steps: int, **lr_skd_cfg: Any
 ) -> Optional[Union[_LRScheduler, lr_scheduler.ReduceLROnPlateau]]:
     """Build and return a learning rate scheduler.
 
@@ -112,13 +112,13 @@ def build_lr_scheduler(
 
     Parameters:
         optimizer: optimization algorithm
-        proc_cfg: hyperparameters for training and evaluation processes
+        num_training_steps: number of training steps
+        lr_skd_cfg: hyperparameters of the learning rate scheduler
 
     Return:
         lr_skd: learning rate scheduler
     """
     # Setup configuration
-    lr_skd_cfg = proc_cfg["solver"]["lr_skd"]
     lr_skd_name = lr_skd_cfg["name"]
 
     # Switch and initialize the specified learning rate scheduler
@@ -137,11 +137,6 @@ def build_lr_scheduler(
         # every epoch
         gamma = lr_skd_cfg["gamma"]
         lr_skd = lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=gamma)
-    elif lr_skd_name == "cos_":
-        # Set the learning rate of each parameter group using cos
-        # annealing
-        T_max, eta_min = lr_skd_cfg["T_max"], lr_skd_cfg["eta_min"]
-        lr_skd = lr_scheduler.CosineAnnealingLR(optimizer=optimizer, T_max=T_max, eta_min=eta_min)
     elif lr_skd_name == "plateau":
         # Reduce learning rate when the monitored metric has stopped
         # improving
@@ -153,7 +148,9 @@ def build_lr_scheduler(
             patience=patience,
         )
     elif lr_skd_name == "cos":
-        lr_skd = lr_scheduler.CosineAnnealingWarmRestarts(optimizer=optimizer, T_0=10, eta_min=1e-5, T_mult=2)
+        lr_skd = get_cosine_schedule_with_warmup(
+            optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
+        )
     elif lr_skd_name is None:
         # LR scheduler is disabled.
         print("LR scheduler is disabled...")

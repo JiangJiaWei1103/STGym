@@ -11,7 +11,7 @@ inherited from `BaseTrainer`.
 import gc
 from logging import Logger
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -59,12 +59,13 @@ class MainTrainer(BaseTrainer):
         loss_fn: _Loss,
         optimizer: Optimizer,
         lr_skd: Union[_LRScheduler, lr_scheduler.ReduceLROnPlateau],
-        ckpt_path: Union[Path, str],
         es: EarlyStopping,
         evaluator: Evaluator,
-        scaler: Union[MaxScaler, StandardScaler],
+        ckpt_path: Union[Path, str],
         train_loader: DataLoader,
         eval_loader: Optional[DataLoader] = None,
+        priori_gs: Optional[List[Tensor]] = None,
+        scaler: Optional[Union[MaxScaler, StandardScaler]] = None,
         use_wandb: bool = True,
     ):
         super(MainTrainer, self).__init__(
@@ -81,6 +82,7 @@ class MainTrainer(BaseTrainer):
         )
         self.train_loader = train_loader
         self.eval_loader = eval_loader if eval_loader else train_loader
+        self.priori_gs = None if priori_gs is None else [A.to(self.device) for A in priori_gs]
         self.scaler = scaler
         self.rescale = proc_cfg["loss_fn"]["rescale"]
         self.custom = proc_cfg["loss_fn"]["custom"]
@@ -110,18 +112,15 @@ class MainTrainer(BaseTrainer):
             x_day = None if "X_day" not in batch_data else batch_data["X_day"].to(self.device)
             x_week = None if "X_week" not in batch_data else batch_data["X_week"].to(self.device)
             y = batch_data["y"].to(self.device)
-            tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
-            diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
             # Forward pass and derive loss
             output, *_ = self.model(
                 x,
+                self.priori_gs,
                 x_day=x_day,
                 x_week=x_week,
-                tid=tid,
-                diw=diw,
                 ycl=y,
-                batches_seen=self._iter,
+                iteration=self._iter,
                 task_level=None if self._cl is None else self._cl.get_task_lv(),
             )
 
@@ -150,6 +149,9 @@ class MainTrainer(BaseTrainer):
             self.optimizer.step()
             self._iter += 1
             train_loss_total += loss.item()
+
+            if self.step_per_batch:
+                self.lr_skd.step()
 
             # Free mem.
             del x, y, output
@@ -189,17 +191,14 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
             x_day = None if "X_day" not in batch_data else batch_data["X_day"].to(self.device)
             x_week = None if "X_week" not in batch_data else batch_data["X_week"].to(self.device)
-            tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
-            diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
             # Forward pass
             output, *_ = self.model(
                 x,
+                self.priori_gs,
                 x_day=x_day,
                 x_week=x_week,
                 ycl=y,
-                tid=tid,
-                diw=diw
             )
 
             # Derive loss
