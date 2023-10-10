@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from .sub_layers import DiffusionConvLayer
+from .sub_layers import DiffusionConvLayer, GatedTCN, GCN2d
 
 
 class DCGRU(nn.Module):
@@ -90,3 +90,78 @@ class DCGRU(nn.Module):
         h_0 = torch.zeros(batch_size, n_series, self.h_dim, device=x.device)
 
         return h_0
+
+
+class GWNetLayer(nn.Module):
+    """Spatio-temporal layer of GWNet.
+
+    One layer is constructed by a graph convolution layer and a gated
+    temporal convolution layer.
+
+    Parameters:
+        in_dim: input feature dimension
+        h_dim: hidden dimension
+        kernel_size: kernel size
+        dilation_factor: dilation factor
+        n_adjs: number of adjacency matrices
+            *Note: Bidirectional transition matrices are used in the
+                original proposal.
+        gcn_depth: depth of graph convolution
+        gcn_dropout: droupout ratio in graph convolution layer
+        bn: if True, apply batch normalization to output node embedding
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        h_dim: int,
+        kernel_size: int,
+        dilation_factor: int,
+        n_adjs: int = 3,
+        gcn_depth: int = 2,
+        gcn_dropout: float = 0.3,
+        bn: bool = True,
+    ) -> None:
+        super(GWNetLayer, self).__init__()
+
+        # Model blocks
+        # Gated temporal convolution layer
+        self.tcn = GatedTCN(in_dim=in_dim, h_dim=h_dim, kernel_size=kernel_size, dilation_factor=dilation_factor)
+        # Graph convolution layer
+        self.gcn = GCN2d(in_dim=h_dim, h_dim=in_dim, n_adjs=n_adjs, depth=gcn_depth, dropout=gcn_dropout)
+        if bn:
+            self.bn = nn.BatchNorm2d(in_dim)
+        else:
+            self.bn = None
+
+    def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
+        """Forward pass.
+
+        Parameters:
+            x: input sequence
+            As: list of adjacency matrices
+
+        Return:
+            h_tcn: intermediate node embedding output by GatedTCN
+            h: output node embedding
+
+        Shape:
+            x: (B, C, N, L), where L denotes the input sequence length
+            As: each A with shape (N, N)
+            h_tcn: (B, h_dim, N, L')
+            h: (B, C, N, L')
+        """
+        x_resid = x
+
+        # Gated temporal convolution layer
+        h_tcn = self.tcn(x)
+
+        # Graph convolution layer
+        h = self.gcn(h_tcn, As)
+
+        out_len = h.shape[-1]
+        h = h + x_resid[..., -out_len:]
+        if self.bn is not None:
+            h = self.bn(h)
+
+        return h_tcn, h
