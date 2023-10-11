@@ -60,7 +60,7 @@ class DCRNN(nn.Module):
         self.encoder = _Encoder(
             input_dim=encoder_input_dim,
             hid_dim=rnn_units,
-            num_layers =num_layers,
+            num_layers=num_layers,
             n_adjs=n_adjs,
             max_diffusion_step=max_diffusion_step,
             n_series=n_series)
@@ -149,11 +149,11 @@ class _Encoder(nn.Module):
             input_dim = input_dim if layer == 0 else hid_dim
             self.encoder.append(
                 _DCGRUCell(
-                    input_dim = input_dim,
-                    hid_dim = hid_dim, 
-                    n_adjs = n_adjs,
-                    max_diffusion_step = max_diffusion_step,
-                    n_series = n_series))
+                    input_dim=input_dim,
+                    hid_dim=hid_dim, 
+                    n_adjs=n_adjs,
+                    max_diffusion_step=max_diffusion_step,
+                    n_series=n_series))
 
     def forward(
         self, 
@@ -242,7 +242,7 @@ class _Decoder(nn.Module):
                     n_adjs=n_adjs,
                     max_diffusion_step=max_diffusion_step,
                     n_series=n_series,
-                    out_dim = output_dim))        
+                    out_dim=output_dim))        
 
     def forward(
         self, 
@@ -332,20 +332,20 @@ class _DCGRUCell(nn.Module):
         
 
         self.gate = _DiffusionConv(
-            input_dim = input_dim,
-            hid_dim = hid_dim,
-            output_dim = hid_dim * 2,
-            n_series = n_series,
-            n_adjs = self.n_adjs,   
-            max_diffusion_step = max_diffusion_step)
+            input_dim=input_dim,
+            hid_dim=hid_dim,
+            output_dim=hid_dim * 2,
+            n_series=n_series,
+            n_adjs=self.n_adjs,   
+            max_diffusion_step=max_diffusion_step)
         
         self.candidate = _DiffusionConv(
-            input_dim = input_dim,
-            hid_dim = hid_dim,
-            output_dim = hid_dim,
-            n_series = n_series,
-            n_adjs = self.n_adjs, 
-            max_diffusion_step = max_diffusion_step)
+            input_dim=input_dim,
+            hid_dim=hid_dim,
+            output_dim=hid_dim,
+            n_series=n_series,
+            n_adjs=self.n_adjs, 
+            max_diffusion_step=max_diffusion_step)
         
         if out_dim is not None:
             self.project = nn.Linear(self.hid_dim, self.out_dim)

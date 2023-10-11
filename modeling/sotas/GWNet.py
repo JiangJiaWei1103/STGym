@@ -205,28 +205,28 @@ class _GWNetLayer(nn.Module):
 
         # dilated convolutions
         self.filter_convs = nn.Conv2d(
-            in_channels = residual_channels,
-            out_channels = dilation_channels,
-            kernel_size = (1, kernel_size),
-            dilation = new_dilation)
+            in_channels=residual_channels,
+            out_channels=dilation_channels,
+            kernel_size=(1, kernel_size),
+            dilation=new_dilation)
 
         self.gate_convs = nn.Conv2d(
-            in_channels = residual_channels,
-            out_channels = dilation_channels,
-            kernel_size = (1, kernel_size), 
-            dilation = new_dilation)
+            in_channels=residual_channels,
+            out_channels=dilation_channels,
+            kernel_size=(1, kernel_size), 
+            dilation=new_dilation)
         
         # 1x1 convolution for residual connection
         self.residual_convs = nn.Conv2d(
-            in_channels = dilation_channels,
-            out_channels = residual_channels,
-            kernel_size = (1, 1))
+            in_channels=dilation_channels,
+            out_channels=residual_channels,
+            kernel_size=(1, 1))
 
         # 1x1 convolution for skip connection
         self.skip_convs = nn.Conv2d(
-            in_channels = dilation_channels,
-            out_channels = skip_channels,
-            kernel_size = (1, 1))
+            in_channels=dilation_channels,
+            out_channels=skip_channels,
+            kernel_size=(1, 1))
         
         self.bn = nn.BatchNorm2d(residual_channels)
 
@@ -308,10 +308,10 @@ class _Linear(nn.Module):
         self.mlp = torch.nn.Conv2d(
             c_in,
             c_out,
-            kernel_size = (1, 1),
-            padding = (0, 0),
-            stride = (1, 1),
-            bias = add_bias)
+            kernel_size=(1, 1),
+            padding=(0, 0),
+            stride=(1, 1),
+            bias=add_bias)
     
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -379,9 +379,10 @@ class _GCN(nn.Module):
         out = [x]
 
         for A in As:
+            x_conv = x
             for k in range(1, self.gcn_depth + 1):
-                x = torch.einsum('ncvl,vw->ncwl',(x, A))
-                out.append(x)
+                x_conv = torch.einsum('ncvl,vw->ncwl',(x_conv, A))
+                out.append(x_conv)
 
         h = torch.cat(out, dim = 1)   # Concat along channel
         h = self.mlp(h)
