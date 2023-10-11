@@ -1,96 +1,59 @@
-# Common configuration for training and evaluation processes
-# ==Training==
-seed: 168
-device: 'cuda:0'
-epochs: 100
-loss_fn:
-    # Name of the loss criterion, the choices are as follows:
-    #    {'l1', 'l2', 'mtk'}
-    name: 'ml1'
-    # Multitask coordination
-    mtk:
-        # Supervised task
-        #supr: 'l1'
-        # Regularization
-        #ae_recons: 0
-        #vq: 0
-    rescale: True
-    custom: False
-    cl: null
+adj_reg: null
 clip_grad_norm: 5
-model_ckpt:
-    ckpt_metric: null
-    ckpt_mode: null
-
-# ==DataLoader==
 dataloader:
-    batch_size: 64
-    shuffle: True
-    num_workers: 4
-
-# ==Solver==
-solver:
-    # ==Optimizer==
-    optimizer:
-        name: adam
-        # Learning rate
-        lr: 0.01
-        # Weight decay, default=1e-2 for AdamW
-        weight_decay: 0
-        # ==Ada* series==
-        # Term added to the denominator to improve numerical stability
-        eps: 1e-3
-        # ==Adadelta==
-        # Coefficient used for computing a running avg of squared gradients
-        rho: null
-        # ==Adagrad==
-        # Learning rate decay
-        lr_decay: null
-        # ==Adam* series==
-        # Coefficients used for computing running avg of grad and its square
-        beta1: 0.9
-        beta2: 0.999
-        #  Whether to use the AMSGrad variant
-        amsgrad: True
-        # ==SGD==
-        # Momentum factor
-        momentum: null
-        # Dampening for momentum
-        dampening: null
-        # Enable Nesterov momentum
-        nesterov: null
-
-    # ==Learning rate scheduler==
-    lr_skd:
-        name: multistep
-        milestones: [20,30,40,50]
-        # Multiplicative factor of learning rate decay
-        gamma: 0.1
-
-        T_max: null
-        eta_min: null
-
-        mode: min
-        factor: 0.5
-        patience: 5
-
-# ==Early Stopping==
+  batch_size: 64
+  num_workers: 4
+  shuffle: true
+device: cuda:0
+epochs: 100
 es:
-    patience: 50
-    mode: 'min'
-
-# ==Evaluator==
+  mode: min
+  patience: 50
 evaluator:
-    # Evaluation metrics, the choices are as follows:
-    #     {'mae', 'rmse', 'rae', 'rrse', 'corr', 'mmae', 'mrmse', 'mmape'}
-    # For single-step
-    #eval_metrics: ['rrse', 'corr']
-    # For multi-step
-    eval_metrics: ['mmae', 'mrmse', 'mmape']
-    # Specify cutoff in multi-horizon scenario
-    horiz_cuts: [3, 6, 12]
-
-# =Misc=
-adj_reg:
-    #update_mechanism: momentum
-    #factor: 0.99
+  eval_metrics:
+  - mmae
+  - mrmse
+  - mmape
+  horiz_cuts:
+  - 3
+  - 6
+  - 12
+loss_fn:
+  cl: null
+  custom: false
+  mtk: null
+  name: ml1
+  rescale: true
+model_ckpt:
+  best_ckpt_mid: last
+  ckpt_metric: null
+  ckpt_mode: null
+seed: 3566295508
+solver:
+  lr_skd:
+    T_max: null
+    eta_min: null
+    factor: 0.5
+    gamma: 0.1
+    milestones:
+    - 20
+    - 30
+    - 40
+    - 50
+    mode: min
+    name: multistep
+    patience: 5
+    step_per_batch: false
+  optimizer:
+    amsgrad: true
+    beta1: 0.9
+    beta2: 0.999
+    dampening: null
+    eps: 1e-3
+    lr: 0.01
+    lr_decay: null
+    momentum: null
+    name: adam
+    nesterov: null
+    rho: null
+    weight_decay: 0
