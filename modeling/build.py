@@ -16,7 +16,7 @@ from torch.nn import Module
 from .Final import HARDPurG
 from .sotas.DCRNN import DCRNN
 from .Final_STGCN import STGCN
-from .Final_GWNet import GWNet
+from .sotas.GWNet import GWNet
 from .Final_ASTGCN import ASTGCN
 from .Final_STSGCN import STSGCN
 from .Final_AGCRN import AGCRN

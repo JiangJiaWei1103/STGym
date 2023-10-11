@@ -227,7 +227,8 @@ class DataProcessor(object):
             v = torch.FloatTensor(L.data)
             return torch.sparse.FloatTensor(i, v, torch.Size(shape))
 
-        self._priori_adj_mat = [_build_sparse_matrix(A) for A in self._priori_adj_mat]
+        if priori_gs_type in ["random_walk", "dual_random_walk"]:
+            self._priori_adj_mat = [_build_sparse_matrix(A) for A in self._priori_adj_mat]
         # ===
 
     def _load_adj_mat(self) -> np.ndarray:
