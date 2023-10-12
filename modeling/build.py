@@ -26,7 +26,7 @@ from .Final_DGCRN import DGCRN
 from .Final_GTS import GTS
 from .Final_STNorm import STNorm
 from .Final_STID import STID
-from .Final_LST_Skip import LST_Skip
+from .sotas.LST_Skip import LST_Skip
 
 
 def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:

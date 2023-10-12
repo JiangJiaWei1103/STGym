@@ -1,0 +1,17 @@
+# Configuration file for model architecture `LST_Skip`
+model_params:
+    # Spatial/Temporal pattern extractor
+    st_params:
+        hidRNN: 100
+        hidCNN: 100
+        hidSkip: 5
+        kernel_size: 6
+        skip: 24
+        highway_window: 24
+        t_window: 168
+        n_series: 321
+        dropout: 0.2
+        output_act: null   
+    out_len: 1
+
+fit_params:
