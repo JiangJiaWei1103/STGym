@@ -2,7 +2,7 @@
 Sub-layers.
 Author: JiaWei Jiang
 """
-from typing import List, Optional
+from typing import List, Optional, Type, Union
 
 import torch
 import torch.nn as nn
@@ -83,23 +83,52 @@ class GCN2d(nn.Module):
 
     GCN2d applies graph convolution over graph signal represented by
     2D node embedding planes.
+
+    Parameters:
+        flow: flow direction of the message passing, the choices are
+            {"src_to_tgt", "tgt_to_src"}
+        mix_prop: if True, mix-hop propagation is activated
     """
 
-    def __init__(self, in_dim: int, h_dim: int, n_adjs: int, depth: int, dropout: float) -> None:
-        super().__init__()
+    def __init__(
+        self,
+        in_dim: int,
+        h_dim: int,
+        n_adjs: int,
+        depth: int,
+        flow: str = "src_to_tgt",
+        normalize: bool = False,
+        mix_prop: bool = False,
+        beta: Optional[float] = None,
+        dropout: Optional[float] = None,
+    ) -> None:
+        super(GCN2d, self).__init__()
 
         # Network parameters
         self.depth = depth
+        self.flow = flow
+        self.normalize = normalize
+        self.mix_prop = mix_prop
+        if mix_prop:
+            assert beta is not None, "Please specify retraining ratio for preserving locality."
+        self.beta = beta
         self.n_node_embs = 1 + n_adjs * depth  # Number of node embeddings (i.e., feature matrices)
+        if flow == "src_to_tgt":
+            self._flow_eq = "bcvl,vw->bcwl"
+        else:
+            self._flow_eq = "bcwl,vw->bcvl"
 
         # Model blocks
         self.conv_filter = Linear2d(in_dim * self.n_node_embs, h_dim)
-        self.dropout = nn.Dropout(dropout)
+        if dropout is not None:
+            self.dropout = nn.Dropout(dropout)
+        else:
+            self.dropout = None
 
     def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Parametersi:
             x: input node features
             As: list of adjacency matrices
 
@@ -111,34 +140,80 @@ class GCN2d(nn.Module):
             As: each A with shape (N, N)
             h: (B, h_dim, N, L)
         """
+        # Information propagation
         x_convs = [x]  # k == 0
-        x_conv = x
+        h_in = x if self.mix_prop else None
         for A in As:
+            if self.normalize:
+                A = self._normalize(A)
             for k in range(1, self.depth + 1):
-                x_conv = torch.einsum("bcvl,vw->bcwl", (x_conv, A))  # Src. to tgt.
+                if k == 1:
+                    x_conv = x
+
+                if self.mix_prop:
+                    x_conv = torch.einsum(self._flow_eq, (x_conv, A))
+                else:
+                    x_conv = self.beta * h_in + (1 - self.beta) * torch.einsum(self._flow_eq, (x_conv, A))
                 x_convs.append(x_conv)
 
-        x = torch.cat(x_convs, dim=1)
-        h = self.conv_filter(x)
-        h = self.dropout(h)
+        h = torch.cat(x_convs, dim=1)
+        h = self.conv_filter(h)
+        if self.dropout is not None:
+            h = self.dropout(h)
 
         return h
+
+    def _normalize(self, A: Tensor) -> Tensor:
+        """Normalize adjacency matrix."""
+        A = A + torch.eye(A.size(0)).to(A.device)
+        A_to_norm = A.T if self.flow == "src_to_tgt" else A
+        D = torch.sum(A_to_norm, dim=1).reshape(-1, 1)
+        A = A_to_norm / D
+        if self.flow == "src_to_tgt":
+            A = A.T
+
+        return A
 
 
 # Temporal pattern extractor
 class GatedTCN(nn.Module):
-    """Gated temporal convolution layer."""
+    """Gated temporal convolution layer.
 
-    def __init__(self, in_dim: int, h_dim: int, kernel_size: int, dilation_factor: int) -> None:
+    Parameters:
+        conv_module: customized convolution module
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        h_dim: int,
+        kernel_size: Union[int, List[int]],
+        dilation_factor: int,
+        dropout: Optional[float] = None,
+        conv_module: Optional[Type[nn.Module]] = None,
+    ) -> None:
         super(GatedTCN, self).__init__()
 
         # Model blocks
-        self.filter = nn.Conv2d(
-            in_channels=in_dim, out_channels=h_dim, kernel_size=(1, kernel_size), dilation=dilation_factor
-        )
-        self.gate = nn.Conv2d(
-            in_channels=in_dim, out_channels=h_dim, kernel_size=(1, kernel_size), dilation=dilation_factor
-        )
+        if conv_module is None:
+            self.filter = nn.Conv2d(
+                in_channels=in_dim, out_channels=h_dim, kernel_size=(1, kernel_size), dilation=dilation_factor
+            )
+            self.gate = nn.Conv2d(
+                in_channels=in_dim, out_channels=h_dim, kernel_size=(1, kernel_size), dilation=dilation_factor
+            )
+        else:
+            self.filter = conv_module(
+                in_channels=in_dim, out_channels=h_dim, kernel_size=kernel_size, dilation=dilation_factor
+            )
+            self.gate = conv_module(
+                in_channels=in_dim, out_channels=h_dim, kernel_size=kernel_size, dilation=dilation_factor
+            )
+
+        if dropout is not None:
+            self.dropout = nn.Dropout(dropout)
+        else:
+            self.dropout = None
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass.
@@ -156,6 +231,56 @@ class GatedTCN(nn.Module):
         x_filter = F.tanh(self.filter(x))
         x_gate = F.sigmoid(self.gate(x))
         h = x_filter * x_gate
+        if self.dropout is not None:
+            h = self.dropout(h)
+
+        return h
+
+
+class DilatedInception(nn.Module):
+    """Dilated inception layer.
+
+    Note that `out_channels` will be split across #kernels.
+    """
+
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: List[int], dilation: int) -> None:
+        super(DilatedInception, self).__init__()
+
+        # Network parameters
+        n_kernels = len(kernel_size)
+        assert out_channels % n_kernels == 0, "out_channels must be divisible by #kernels."
+        h_dim = out_channels // n_kernels
+
+        # Model blocks
+        self.convs = nn.ModuleList()
+        for k in kernel_size:
+            self.convs.append(
+                nn.Conv2d(in_channels=in_channels, out_channels=h_dim, kernel_size=(1, k), dilation=dilation)
+            )
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass.
+
+        Parameters:
+            x: input sequence
+
+        Return:
+            h: output sequence
+
+        Shape:
+            x: (B, C, N, L)
+            h: (B, out_channels, N, L')
+        """
+        x_convs = []
+        for conv in self.convs:
+            x_conv = conv(x)
+            x_convs.append(x_conv)
+
+        # Truncate according to the largest filter
+        out_len = x_convs[-1].shape[-1]
+        for i, x_conv in enumerate(x_convs):
+            x_convs[i] = x_conv[..., -out_len:]
+        h = torch.cat(x_convs, dim=1)
 
         return h
 

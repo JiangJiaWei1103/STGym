@@ -16,6 +16,7 @@ from torch.nn import Module
 from .Final import HARDPurG
 from .sotas.DCRNN import DCRNN
 from .sotas.GWNet import GWNet
+from .sotas.MTGNN import MTGNN
 
 
 def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
@@ -35,6 +36,8 @@ def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
         model = DCRNN(**model_cfg)
     elif model_name == "GWNet":
         model = GWNet(**model_cfg)
+    elif model_name == "MTGNN":
+        model = MTGNN(**model_cfg)
     else:
         raise RuntimeError(f"{model_name} isn't registered.")
 
