@@ -11,7 +11,7 @@ from torch import Tensor
 
 from modeling.module.tconv import TConvBaseModule
 
-from .sub_layers import DiffusionConvLayer, DilatedInception, GatedTCN, GCN2d
+from .sub_layers import DiffusionConvLayer, DilatedInception, GatedTCN, InfoPropLayer
 
 
 class DCGRU(nn.Module):
@@ -130,7 +130,7 @@ class GWNetLayer(nn.Module):
         # Gated temporal convolution layer
         self.tcn = GatedTCN(in_dim=in_dim, h_dim=h_dim, kernel_size=kernel_size, dilation_factor=dilation_factor)
         # Graph convolution layer
-        self.gcn = GCN2d(in_dim=h_dim, h_dim=in_dim, n_adjs=n_adjs, depth=gcn_depth, dropout=gcn_dropout)
+        self.gcn = InfoPropLayer(in_dim=h_dim, h_dim=in_dim, n_adjs=n_adjs, depth=gcn_depth, dropout=gcn_dropout)
         if bn:
             self.bn = nn.BatchNorm2d(in_dim)
         else:
@@ -226,13 +226,13 @@ class MTGNNLayer(TConvBaseModule):
             conv_module=DilatedInception,
         )
         # Graph convolution layer
-        self.gcn = GCN2d(
+        self.gcn = InfoPropLayer(
             in_dim=h_dim,
             h_dim=in_dim,
             n_adjs=n_adjs,
             depth=gcn_depth,
             flow="tgt_to_src",  # Row norm
-            normalize=True,
+            normalize="asym",
             mix_prop=True,
             beta=beta,
         )

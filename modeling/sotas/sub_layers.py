@@ -52,8 +52,7 @@ class DiffusionConvLayer(nn.Module):
 
         Shape:
             x: (B, N, C)
-            As: each A with shape (2, |E|), where |E| denotes the
-                number edges
+            As: each A with shape (N, N)
             h: (B, N, h_dim)
         """
         batch_size, n_series, _ = x.shape
@@ -64,9 +63,9 @@ class DiffusionConvLayer(nn.Module):
         for A in As:
             for k in range(1, self.max_diffusion_step + 1):
                 if k == 1:
-                    x_conv = torch.mm(A, x)
+                    x_conv = torch.einsum("bvc,vw->bwc", (x, A))
                 else:
-                    x_conv = 2 * torch.mm(A, x_conv) - x
+                    x_conv = 2 * torch.einsum("bvc,vw->bwc", (x_conv, A)) - x  # Purpose?
                     x = x_conv
                 x_convs = torch.cat([x_convs, x_conv.unsqueeze(0)], dim=0)
 
@@ -78,16 +77,13 @@ class DiffusionConvLayer(nn.Module):
         return h
 
 
-class GCN2d(nn.Module):
-    """Graph convolution layer over 2D planes.
-
-    GCN2d applies graph convolution over graph signal represented by
-    2D node embedding planes.
+class InfoPropLayer(nn.Module):
+    """Information propagation layer used in GWNet and MTGNN.
 
     Parameters:
         flow: flow direction of the message passing, the choices are
             {"src_to_tgt", "tgt_to_src"}
-        mix_prop: if True, mix-hop propagation is activated
+        mix_prop: if True, mix-hop propagation in MTGNN is used
     """
 
     def __init__(
@@ -97,28 +93,23 @@ class GCN2d(nn.Module):
         n_adjs: int,
         depth: int,
         flow: str = "src_to_tgt",
-        normalize: bool = False,
+        normalize: Optional[str] = None,
         mix_prop: bool = False,
         beta: Optional[float] = None,
         dropout: Optional[float] = None,
     ) -> None:
-        super(GCN2d, self).__init__()
+        super(InfoPropLayer, self).__init__()
 
         # Network parameters
         self.depth = depth
-        self.flow = flow
-        self.normalize = normalize
         self.mix_prop = mix_prop
         if mix_prop:
             assert beta is not None, "Please specify retraining ratio for preserving locality."
         self.beta = beta
         self.n_node_embs = 1 + n_adjs * depth  # Number of node embeddings (i.e., feature matrices)
-        if flow == "src_to_tgt":
-            self._flow_eq = "bcvl,vw->bcwl"
-        else:
-            self._flow_eq = "bcwl,vw->bcvl"
 
         # Model blocks
+        self.gconv = GCN2d(flow=flow, normalize=normalize)
         self.conv_filter = Linear2d(in_dim * self.n_node_embs, h_dim)
         if dropout is not None:
             self.dropout = nn.Dropout(dropout)
@@ -142,20 +133,18 @@ class GCN2d(nn.Module):
         """
         # Information propagation
         x_convs = [x]  # k == 0
+        x_conv = None
         h_in = x if self.mix_prop else None
         for A in As:
-            if self.normalize:
-                A = self._normalize(A)
             for k in range(1, self.depth + 1):
-                if k == 1:
-                    x_conv = x
-
+                x_conv = x if k == 1 else x_conv
                 if self.mix_prop:
-                    x_conv = torch.einsum(self._flow_eq, (x_conv, A))
+                    x_conv = self.beta * h_in + (1 - self.beta) * self.gconv(x_conv, A)
                 else:
-                    x_conv = self.beta * h_in + (1 - self.beta) * torch.einsum(self._flow_eq, (x_conv, A))
+                    x_conv = self.gconv(x_conv, A)
                 x_convs.append(x_conv)
 
+        # Information selection
         h = torch.cat(x_convs, dim=1)
         h = self.conv_filter(h)
         if self.dropout is not None:
@@ -163,12 +152,62 @@ class GCN2d(nn.Module):
 
         return h
 
+
+class GCN2d(nn.Module):
+    """Graph convolution layer over 2D planes.
+
+    GCN2d applies graph convolution over graph signal represented by
+    2D node embedding planes.
+    """
+
+    def __init__(
+        self,
+        flow: str = "src_to_tgt",
+        normalize: Optional[str] = None,
+    ) -> None:
+        super(GCN2d, self).__init__()
+
+        self.flow = flow
+        self.normalize = normalize
+        if flow == "src_to_tgt":
+            self._flow_eq = "bcvl,vw->bcwl"
+        else:
+            self._flow_eq = "bcwl,vw->bcvl"
+
+    def forward(self, x: Tensor, A: Tensor) -> Tensor:
+        """Forward pass.
+
+        Parameters:
+            x: input node embeddings
+            A: adjacency matrix
+
+        Return:
+            h: output node embeddings
+
+        Shape:
+            x: (B, C, N, L)
+            h: (B, C, N, L), the shape is the same as the input
+        """
+        if self.normalize is not None:
+            A = self._normalize(A)
+        h = torch.einsum(self._flow_eq, (x, A))
+
+        return h
+
     def _normalize(self, A: Tensor) -> Tensor:
         """Normalize adjacency matrix."""
+        if self.flow == "src_to_tgt":
+            # Do column normalization
+            A = A.T
+
+        # Add self-loop
         A = A + torch.eye(A.size(0)).to(A.device)
-        A_to_norm = A.T if self.flow == "src_to_tgt" else A
-        D = torch.sum(A_to_norm, dim=1).reshape(-1, 1)
-        A = A_to_norm / D
+
+        # Normalize
+        if self.normalize == "asym":
+            D = torch.sum(A, dim=1).reshape(-1, 1)
+            A = A / D
+
         if self.flow == "src_to_tgt":
             A = A.T
 
