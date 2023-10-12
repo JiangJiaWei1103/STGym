@@ -96,20 +96,19 @@ class LST_Skip(nn.Module):
             x: input hour features
 
         Shape:
-            x: (B, T, N, C), where B is the batch_size, T is the lookback
-                time window and N is the number of time series
-            output: (B, N)
+            x: (B, P, N, C)
+            output: (B, Q)
         """
         batch_size = x.size(0)
         
         # CNN, Convolutional Component
-        c = x.permute(0, 3, 1, 2)   # (B, C, T, N)
-        c = F.relu(self.conv(c))    # (B, hidC, T', 1)
+        c = x.permute(0, 3, 1, 2)   # (B, C, P, N)
+        c = F.relu(self.conv(c))    # (B, hidC, L, 1)
         c = self.dropout(c)
-        c = torch.squeeze(c, 3)     # (B, hidC, T')
+        c = torch.squeeze(c, 3)     # (B, hidC, L)
         
         # RNN, Recurrent Component
-        r = c.permute(2, 0, 1).contiguous()     # (T', B, hidC)
+        r = c.permute(2, 0, 1).contiguous()     # (L, B, hidC)
         _, r = self.GRU(r)
         r = self.dropout(torch.squeeze(r, 0))   # (B, hidR)
 
