@@ -21,7 +21,7 @@ from .Final_ASTGCN import ASTGCN
 from .Final_STSGCN import STSGCN
 from .Final_AGCRN import AGCRN
 from .Final_GMAN import GMAN
-from .Final_MTGNN import MTGNN
+from .sotas.MTGNN import MTGNN
 from .Final_DGCRN import DGCRN
 from .Final_GTS import GTS
 from .Final_STNorm import STNorm
