@@ -27,6 +27,7 @@ from .Final_GTS import GTS
 from .Final_STNorm import STNorm
 from .Final_STID import STID
 from .sotas.LST_Skip import LST_Skip
+from .sotas.TPA_LSTM import TPA_LSTM
 
 
 def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
@@ -68,6 +69,8 @@ def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
         model = STID(**model_cfg)
     elif model_name == "LST_Skip":
         model = LST_Skip(**model_cfg)
+    elif model_name == "TPA_LSTM":
+        model = TPA_LSTM(**model_cfg)
     else:
         raise RuntimeError(f"{model_name} isn't registered.")
 
