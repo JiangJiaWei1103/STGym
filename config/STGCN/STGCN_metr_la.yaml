@@ -11,8 +11,5 @@ model_params:
         graph_conv_type: 'cheb_graph_conv'
         bias: True
         dropout: 0.5
-        
-    device: 'cuda:0'      
-    out_dim: 12
 
 fit_params:
