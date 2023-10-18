@@ -21,7 +21,7 @@ clip_grad_norm: 5
 model_ckpt:
     ckpt_metric: null
     ckpt_mode: null
-    best_ckpt_mid: last
+    best_ckpt_mid: loss
 
 # ==DataLoader==
 dataloader:
