@@ -1,0 +1,25 @@
+# Configuration file for model architecture `SCINet`
+model_params:
+    net_params:
+        dataset_name: electricity
+        t_window: 168
+        n_series: 321
+        num_stacks: 2
+        num_levels: 3
+        num_decoder_layer: 2
+        output_len: 3
+        concat_len: 165
+        hid_size: 8
+        kernel_size: 5
+        groups: 321
+        dropout: 0
+        INN: True
+        single_step_output_One: 0
+        positionalEcoding: False
+        RIN: False
+    loss_params:
+        single_step: 1
+        lastWeight: 1.0
+        criterion: smooth_l1_loss
+
+fit_params:

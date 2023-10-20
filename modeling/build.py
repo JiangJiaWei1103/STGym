@@ -26,6 +26,8 @@ from .Final_DGCRN import DGCRN
 from .Final_GTS import GTS
 from .Final_STNorm import STNorm
 from .Final_STID import STID
+from .Final_SCINet import SCINet
+from .sotas.STAEformer import STAEformer
 from .sotas.LST_Skip import LST_Skip
 from .sotas.TPA_LSTM import TPA_LSTM
 
@@ -67,6 +69,10 @@ def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
         model = STNorm(**model_cfg)
     elif model_name == "STID":
         model = STID(**model_cfg)
+    elif model_name == "SCINet":
+        model = SCINet(**model_cfg)
+    elif model_name == "STAEformer":
+        model = STAEformer(**model_cfg)
     elif model_name == "LST_Skip":
         model = LST_Skip(**model_cfg)
     elif model_name == "TPA_LSTM":
