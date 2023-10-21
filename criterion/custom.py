@@ -47,13 +47,6 @@ class MaskedLoss(_Loss):
         mask = torch.where(torch.isnan(mask), torch.zeros_like(mask), mask)
 
         return mask
-    
-    def huber_loss(self, y_pred: Tensor, y_true: Tensor, rho: int = 1) -> Tensor:
-
-        loss = torch.abs(y_pred - y_true)
-        loss = torch.where(loss > rho, loss - 0.5 * rho, (0.5 / rho) * torch.square(loss))
-
-        return loss
 
     def _get_base_loss(self, y_true: Tensor, y_pred: Tensor) -> Tensor:
         """Derive and return loss using base loss criterion."""
@@ -65,6 +58,6 @@ class MaskedLoss(_Loss):
         elif self.name == "mape":
             base_loss = torch.abs(y_pred - y_true) / y_true
         elif self.name == "huber":
-            base_loss = self.huber_loss(y_pred, y_true)
+            base_loss = torch.nn.HuberLoss()(y_pred, y_true)
 
         return base_loss
