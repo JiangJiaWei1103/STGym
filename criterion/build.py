@@ -35,6 +35,8 @@ def build_criterion(**loss_params: Any) -> Optional[_Loss]:
         criterion = nn.L1Loss()
     elif loss_fn == "l2":
         criterion = nn.MSELoss()
+    elif loss_fn == "huber":
+        criterion = nn.HuberLoss()
     elif loss_fn == "mtk":
         print("Loss criterion default building is disabled...")
         criterion = None
@@ -47,8 +49,8 @@ def build_criterion(**loss_params: Any) -> Optional[_Loss]:
     elif loss_fn == "mmape":
         # Masked MAPE
         criterion = MaskedLoss("mape")
-    elif loss_fn == "huber":
-        # Huber loss
+    elif loss_fn == "mhuber":
+        # Masked Huber loss
         criterion = MaskedLoss("huber")
     else:
         raise RuntimeError(f"Loss criterion {loss_fn} isn't registered...")
