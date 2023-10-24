@@ -644,61 +644,11 @@ class _SCIBlockLevel(nn.Module):
 
         Shape:
             x: (B, T, N)
-            F_even_update: (B, D, T)
-            F_odd_update: (B, D, T)
-        """
-
-        F_even_update, F_odd_update = self.level(x)
-
-        return F_even_update, F_odd_update
-
-class _LevelSCINet(nn.Module):
-    def __init__(
-        self,
-        in_planes: int,
-        hidden_size: int,
-        kernel_size: int,
-        groups: int,
-        dropout: float,
-        INN: bool
-    ):
-        """
-        SCINet Level.
-
-        Parameters:
-            in_planes: input channels
-            hidden_size: hidden size for Conv1d
-            kernel_size: kernel size for Conv1d
-            groups: groups for Conv1d
-            dropout: dropout ratio
-            INN: whether to use interactive learning
-        """
-        super(_LevelSCINet, self).__init__()
-
-        self.interact = _SCIBlockLevel(
-            in_planes=in_planes,
-            hidden_size=hidden_size,
-            kernel_size=kernel_size,
-            groups=groups,
-            dropout=dropout,
-            INN=INN)
-
-    def forward(
-        self,
-        x: Tensor
-    ) -> Tuple[Tensor, Tensor]:
-        """
-        Forward pass.
-
-        Parameters:
-            x: input features
-
-        Shape:
-            x: (B, T, N)
             F_even_update: (B, T, D)
             F_odd_update: (B, T, D)
         """
-        F_even_update, F_odd_update = self.interact(x)
+
+        F_even_update, F_odd_update = self.level(x)
         F_even_update = F_even_update.permute(0, 2, 1)
         F_odd_update = F_odd_update.permute(0, 2, 1)
 
@@ -731,7 +681,7 @@ class _SCINet_Tree(nn.Module):
 
         self.current_level = current_level
 
-        self.workingblock = _LevelSCINet(
+        self.workingblock = _SCIBlockLevel(
             in_planes=in_planes,
             hidden_size=hidden_size,
             kernel_size=kernel_size,
