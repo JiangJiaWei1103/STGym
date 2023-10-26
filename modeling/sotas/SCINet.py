@@ -388,17 +388,19 @@ class SCINet(nn.Module):
             scaler: scaler
             criterion: criterion
         """
-        y_pred = scaler.inverse_transform(y_pred)
-        y_true = scaler.inverse_transform(y_true)
+        y_pred_inv = scaler.inverse_transform(y_pred)
+        y_true_inv = scaler.inverse_transform(y_true)
         if Midoutput is not None:
             Midoutput = scaler.inverse_transform(Midoutput)
 
         if self.dataset_name in MTSFBerks:
             y_pred = y_pred[:, -1, :]
             y_true = y_true[:, -1, :]
-            loss = criterion(y_pred, y_true)
+            y_pred_inv = y_pred_inv[:, -1, :]
+            y_true_inv = y_true_inv[:, -1, :]
+            loss = criterion(y_pred_inv, y_true_inv)
         else:
-            loss = criterion(y_pred, y_true)
+            loss = criterion(y_pred_inv, y_true_inv)
 
         return loss, y_pred, y_true
 
@@ -433,7 +435,7 @@ class _SCIBlock(nn.Module):
         self,
         in_planes: int,
         hidden_size: int = 1,
-        kernel: int = 5,
+        kernel_size: int = 5,
         groups: int = 1,
         dropout: float = 0.5,
         splitting: bool = True,
@@ -445,7 +447,7 @@ class _SCIBlock(nn.Module):
         Parameters:
             in_planes: input channels
             hidden_size: hidden size for Conv1d
-            kernel: kernel size for Conv1d
+            kernel_size: kernel size for Conv1d
             groups: groups for Conv1d
             dropout: dropout ratio
             splitting: whether to split
@@ -454,7 +456,7 @@ class _SCIBlock(nn.Module):
         super(_SCIBlock, self).__init__()
 
         self.hidden_size = hidden_size
-        self.kernel_size = kernel
+        self.kernel_size = kernel_size
         self.groups = groups
         self.dropout = dropout
         self.splitting = splitting
@@ -570,8 +572,8 @@ class _SCIBlock(nn.Module):
         
         Shape:
             x: (B, T, N)
-            F_even_update: (B, N, T)
-            F_odd_update: (B, N, T)
+            F_even_update: (B, T, N)
+            F_odd_update: (B, T, N)
         """
         if self.splitting:
             # splitting
@@ -590,6 +592,9 @@ class _SCIBlock(nn.Module):
             F_even_update = Fs_even + self.U(Fs_odd)
             F_odd_update = Fs_odd - self.P(Fs_even)
 
+            F_even_update = F_even_update.permute(0, 2, 1)  # (B, T, N)
+            F_odd_update = F_odd_update.permute(0, 2, 1)    # (B, T, N)
+
             return (F_even_update, F_odd_update)
         else:
             F_even = F_even.permute(0, 2, 1)    # (B, N, T)
@@ -598,61 +603,10 @@ class _SCIBlock(nn.Module):
             F_odd_update = F_odd - self.P(F_even)
             F_even_update = F_even + self.U(Fs_odd)
 
+            F_even_update = F_even_update.permute(0, 2, 1)  # (B, T, N)
+            F_odd_update = F_odd_update.permute(0, 2, 1)    # (B, T, N)
+
             return (F_even_update, F_odd_update)
-        
-class _SCIBlockLevel(nn.Module):
-    def __init__(
-        self,
-        in_planes: int,
-        hidden_size: int,
-        kernel_size: int,
-        groups: int,
-        dropout: float,
-        INN: bool
-    ):
-        """
-        SCI-Block Level.
-
-        Parameters:
-            in_planes: input channels
-            hidden_size: hidden size for Conv1d
-            kernel_size: kernel size for Conv1d
-            groups: groups for Conv1d
-            dropout: dropout ratio
-            INN: whether to use interactive learning
-        """
-        super(_SCIBlockLevel, self).__init__()
-
-        self.level = _SCIBlock(
-            in_planes=in_planes,
-            hidden_size=hidden_size,
-            kernel=kernel_size,
-            groups=groups,
-            dropout=dropout,
-            splitting=True,
-            INN=INN)
-
-    def forward(
-        self,
-        x: Tensor
-    ) -> Tuple[Tensor, Tensor]:
-        """
-        Forward pass.
-
-        Parameters:
-            x: input features
-
-        Shape:
-            x: (B, T, N)
-            F_even_update: (B, T, D)
-            F_odd_update: (B, T, D)
-        """
-
-        F_even_update, F_odd_update = self.level(x)
-        F_even_update = F_even_update.permute(0, 2, 1)
-        F_odd_update = F_odd_update.permute(0, 2, 1)
-
-        return F_even_update, F_odd_update
     
 class _SCINet_Tree(nn.Module):
     def __init__(
@@ -681,7 +635,7 @@ class _SCINet_Tree(nn.Module):
 
         self.current_level = current_level
 
-        self.workingblock = _SCIBlockLevel(
+        self.workingblock = _SCIBlock(
             in_planes=in_planes,
             hidden_size=hidden_size,
             kernel_size=kernel_size,

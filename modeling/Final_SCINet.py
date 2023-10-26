@@ -388,17 +388,19 @@ class SCINet(nn.Module):
             scaler: scaler
             criterion: criterion
         """
-        y_pred = scaler.inverse_transform(y_pred)
-        y_true = scaler.inverse_transform(y_true)
+        y_pred_inv = scaler.inverse_transform(y_pred)
+        y_true_inv = scaler.inverse_transform(y_true)
         if Midoutput is not None:
             Midoutput = scaler.inverse_transform(Midoutput)
 
         if self.dataset_name in MTSFBerks:
             y_pred = y_pred[:, -1, :]
             y_true = y_true[:, -1, :]
-            loss = criterion(y_pred, y_true)
+            y_pred_inv = y_pred_inv[:, -1, :]
+            y_true_inv = y_true_inv[:, -1, :]
+            loss = criterion(y_pred_inv, y_true_inv)
         else:
-            loss = criterion(y_pred, y_true)
+            loss = criterion(y_pred_inv, y_true_inv)
 
         return loss, y_pred, y_true
 
