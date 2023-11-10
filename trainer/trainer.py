@@ -183,6 +183,9 @@ class MainTrainer(BaseTrainer):
         y_true = None
         y_pred = None
 
+        if datatype == 'test':
+            self.eval_loader = tqdm(self.eval_loader)
+
         self.model.eval()
         self.profiler.start(proc_type=datatype)
         for i, batch_data in enumerate(self.eval_loader):

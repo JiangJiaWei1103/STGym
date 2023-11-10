@@ -57,6 +57,12 @@ class TrainEvalArgParser(BaseArgParser):
             help="whether to evaluate on test set",
         )
         self.argparser.add_argument(
+            "--model-path",
+            type=str,
+            default=None,
+            help="model path",
+        )
+        self.argparser.add_argument(
             "--use-wandb",
             type=self._str2bool,
             default=True,

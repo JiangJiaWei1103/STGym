@@ -88,8 +88,10 @@ def main(args: Namespace) -> None:
     cmd[6] = str(args.model_name)
     cmd[10] = str(args.input_path)
     cmd[12] = str(args.dataset_name)
+    if args.eval_on_test is not None:
+        cmd[8] = str(args.eval_on_test)
     if args.exp_id is not None:
-        cmd[-1] = str(args.exp_id)
+        cmd[-1] = str(args.exp_id) 
 
     # Run multi-seed processes
     multi_seed_proc_wrapper = MultiSeedProcWrapper(cmd, args.n_seeds)

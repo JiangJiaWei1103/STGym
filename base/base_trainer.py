@@ -137,6 +137,7 @@ class BaseTrainer:
         Return:
             y_pred: prediction on test set
         """
+        self.logger.info("Start testing...")
         self.eval_loader = test_loader
         _, eval_result, y_pred = self._eval_epoch(return_output=True, datatype="test")
         test_prf_report = {"test": eval_result}
