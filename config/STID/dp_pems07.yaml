@@ -1,6 +1,6 @@
 # Configuration for data processing
 # ==Metadata==
-dataset_name: metr_la
+dataset_name: pems07
 
 # ==Data Processing==
 dp:
@@ -30,8 +30,8 @@ dp:
 cv:
     scheme: tssplit
     n_folds: 1
-    train_ratio: 0.875
-    val_ratio: 0.125
+    train_ratio: 0.75
+    val_ratio: 0.25
 
 # ==Dataset==
 dataset:

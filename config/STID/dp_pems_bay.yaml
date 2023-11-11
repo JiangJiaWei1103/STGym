@@ -1,6 +1,6 @@
 # Configuration for data processing
 # ==Metadata==
-dataset_name: metr_la
+dataset_name: pems_bay
 
 # ==Data Processing==
 dp:

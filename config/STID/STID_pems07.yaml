@@ -3,7 +3,7 @@ model_params:
     # Spatial/Temporal pattern extractor
     st_params:
         num_layer: 3
-        n_series: 207
+        n_series: 883
         t_window: 12
         input_dim: 3
         node_dim: 32
