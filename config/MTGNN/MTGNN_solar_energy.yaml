@@ -1,0 +1,32 @@
+# Configuration file for model architecture `MTGNN`
+model_params:
+    # Spatial/Temporal Convolution Module
+    st_params:
+        layers: 5
+        dropout: 0.3
+        layer_norm_affline: False 
+        # Spatial
+        gcn_true: True
+        gcn_depth: 2
+        n_series: 137
+        propalpha: 0.05
+        # Temporal
+        dilation_exponential: 2      # Multi-step: 1, Single-step: 2
+        kernel_set: [2, 3, 6, 7]
+        t_window: 168
+    # Graph Learning Layer
+    gl_params:
+        buildA_true: True
+        subgraph_size: 20
+        node_dim: 40
+        tanhalpha: 3
+    # input/output channels
+    ch_params:
+        conv_channels: 16
+        residual_channels: 16
+        skip_channels: 32
+        end_channels: 64
+        in_channels: 1
+    out_len: 1
+
+fit_params:

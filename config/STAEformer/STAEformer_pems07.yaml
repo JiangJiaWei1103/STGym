@@ -1,0 +1,22 @@
+# Configuration file for model architecture `STAEformer`
+model_params:
+    # Spatial/Temporal pattern extractor
+    st_params:
+        n_series: 883
+        t_window: 12
+        n_tids: 288
+        num_layers: 3
+        input_dim: 3
+        output_dim: 1
+        input_embedding_dim: 24
+        tid_embedding_dim: 24
+        diw_embedding_dim: 24
+        spatial_embedding_dim: 0
+        adaptive_embedding_dim: 80
+        feed_forward_dim: 256
+        num_heads: 4
+        dropout: 0.1
+        use_mixed_proj: True
+    out_len: 12
+
+fit_params:
