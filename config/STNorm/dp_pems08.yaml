@@ -1,13 +1,13 @@
 # Configuration for data processing
 # ==Metadata==
-dataset_name: metr_la
+dataset_name: pems08
 
 # ==Data Processing==
 dp:
     # Time stamp encoder
     time_enc:
       add_tid: True
-      add_diw: True
+      add_diw: False
       n_tids: 288
       max_norm: True
 
@@ -30,8 +30,8 @@ dp:
 cv:
     scheme: tssplit
     n_folds: 1
-    train_ratio: 0.875
-    val_ratio: 0.125
+    train_ratio: 0.75
+    val_ratio: 0.25
 
 # ==Dataset==
 dataset:

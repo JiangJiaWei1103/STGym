@@ -24,8 +24,8 @@ from .Final_GMAN import GMAN
 from .sotas.MTGNN import MTGNN
 from .Final_DGCRN import DGCRN
 from .Final_GTS import GTS
-from .Final_STNorm import STNorm
-from .Final_STID import STID
+from .sotas.STNorm import STNorm
+from .sotas.STID import STID
 from .sotas.SCINet import SCINet
 from .sotas.STAEformer import STAEformer
 from .sotas.MegaCRN import MegaCRN
