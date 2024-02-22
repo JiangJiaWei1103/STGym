@@ -3,7 +3,7 @@ model_params:
     # Spatial/Temporal pattern extractor
     st_params:
         num_layers: 2
-        n_series: 207
+        n_series: 883
         rnn_units: 64
         cheb_k: 2
         in_channels: 2

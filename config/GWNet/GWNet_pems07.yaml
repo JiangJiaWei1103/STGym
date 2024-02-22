@@ -1,0 +1,27 @@
+# Configuration file for model architecture `GWNet`
+model_params:
+    # Spatial/Temporal Convolution Module
+    st_params:
+        blocks: 4
+        layers: 2
+        dropout: 0.3
+        # Spatial
+        adpadj: True
+        gcn_true: True
+        n_adjs: 3
+        gcn_depth: 2
+        n_series: 883
+        # Temporal
+        t_window: 12
+        dilation_exponential: 2
+        kernel_size: 2
+    # input/output channels
+    ch_params:
+        dilation_channels: 32
+        residual_channels: 32
+        skip_channels: 256
+        end_channels: 512
+        in_channels: 2
+    out_len: 12
+
+fit_params:

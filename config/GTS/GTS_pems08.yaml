@@ -8,14 +8,14 @@ model_params:
         encoder_input_dim: 2
         decoder_input_dim: 1
         max_diffusion_step: 3
-        n_series: 207
+        n_series: 170
         temperature: 0.5
         cl_decay_steps: 2000
         use_curriculum_learning: True  
     # Node features
     nf_params:
-        train_ratio: 0.7
-        dataset_name: metr_la
+        train_ratio: 0.6
+        dataset_name: pems08
         k: 10
     batch_size: 64
     device: 'cuda:0'

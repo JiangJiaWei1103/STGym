@@ -1,6 +1,6 @@
 # Configuration for data processing
 # ==Metadata==
-dataset_name: metr_la
+dataset_name: pems08
 
 # ==Data Processing==
 dp:
@@ -24,14 +24,14 @@ dp:
 
     # Auxiliary data
     aux_data:
-        file_path: ["./data/raw/metr_la/SE_METR.txt"]
+        file_path: ["./data/raw/pems08/SE_pems08.txt"]
 
 # ==CV Scheme==
 cv:
     scheme: tssplit
     n_folds: 1
-    train_ratio: 0.875
-    val_ratio: 0.125
+    train_ratio: 0.75
+    val_ratio: 0.25
 
 # ==Dataset==
 dataset:

@@ -4,7 +4,7 @@ model_params:
     st_params:
         # Spatial
         gcn_depth: 2
-        n_series: 207
+        n_series: 883
         # Temporal
         rnn_size: 64
         t_window: 12

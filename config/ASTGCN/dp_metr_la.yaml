@@ -15,7 +15,7 @@ dp:
     holdout_ratio: 0.2
 
     # Scaling
-    scaling: binary_laplacian #standard
+    scaling: standard
 
     # Priori graph structure
     priori_gs:

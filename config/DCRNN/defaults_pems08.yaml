@@ -25,7 +25,7 @@ model_ckpt:
 
 # ==DataLoader==
 dataloader:
-    batch_size: 16
+    batch_size: 64
     shuffle: True
     num_workers: 4
 
@@ -35,12 +35,12 @@ solver:
     optimizer:
         name: adam
         # Learning rate
-        lr: 0.001
+        lr: 0.003
         # Weight decay, default=1e-2 for AdamW
         weight_decay: 0
         # ==Ada* series==
         # Term added to the denominator to improve numerical stability
-        eps: 1e-8
+        eps: 1e-3
         # ==Adadelta==
         # Coefficient used for computing a running avg of squared gradients
         rho: null
@@ -52,7 +52,7 @@ solver:
         beta1: 0.9
         beta2: 0.999
         #  Whether to use the AMSGrad variant
-        amsgrad: False
+        amsgrad: True
         # ==SGD==
         # Momentum factor
         momentum: null
@@ -64,9 +64,9 @@ solver:
     # ==Learning rate scheduler==
     lr_skd:
         name: multistep
-        milestones: [10, 20, 30, 40, 50, 60, 70, 80, 90]
+        milestones: [80]
         # Multiplicative factor of learning rate decay
-        gamma: 0.9
+        gamma: 0.3
 
         T_max: null
         eta_min: null
@@ -80,7 +80,7 @@ solver:
 
 # ==Early Stopping==
 es:
-    patience: 10
+    patience: 50
     mode: 'min'
 
 # ==Evaluator==

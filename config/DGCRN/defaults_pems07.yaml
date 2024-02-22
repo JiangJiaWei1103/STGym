@@ -2,7 +2,7 @@
 # ==Training==
 seed: 168
 device: 'cuda:0'
-epochs: 100
+epochs: 150
 loss_fn:
     # Name of the loss criterion, the choices are as follows:
     #    {'l1', 'l2', 'mtk'}
@@ -16,7 +16,9 @@ loss_fn:
         #vq: 0
     rescale: True
     custom: False
-    cl: null
+    cl: 
+        lv_up_period: 8500
+        task_lv_max: 12
 clip_grad_norm: 5
 model_ckpt:
     ckpt_metric: null
@@ -25,7 +27,7 @@ model_ckpt:
 
 # ==DataLoader==
 dataloader:
-    batch_size: 16
+    batch_size: 12
     shuffle: True
     num_workers: 4
 
@@ -37,7 +39,7 @@ solver:
         # Learning rate
         lr: 0.001
         # Weight decay, default=1e-2 for AdamW
-        weight_decay: 0
+        weight_decay: 0.0001
         # ==Ada* series==
         # Term added to the denominator to improve numerical stability
         eps: 1e-8
@@ -64,9 +66,9 @@ solver:
     # ==Learning rate scheduler==
     lr_skd:
         name: multistep
-        milestones: [10, 20, 30, 40, 50, 60, 70, 80, 90]
+        milestones: [100, 120]
         # Multiplicative factor of learning rate decay
-        gamma: 0.9
+        gamma: 0.5
 
         T_max: null
         eta_min: null
@@ -80,7 +82,7 @@ solver:
 
 # ==Early Stopping==
 es:
-    patience: 10
+    patience: 150
     mode: 'min'
 
 # ==Evaluator==

@@ -37,7 +37,7 @@ solver:
         # Learning rate
         lr: 0.001
         # Weight decay, default=1e-2 for AdamW
-        weight_decay: 0
+        weight_decay: 0.0001
         # ==Ada* series==
         # Term added to the denominator to improve numerical stability
         eps: 1e-8
@@ -64,9 +64,9 @@ solver:
     # ==Learning rate scheduler==
     lr_skd:
         name: multistep
-        milestones: [10, 20, 30, 40, 50, 60, 70, 80, 90]
+        milestones: [20, 30, 40, 50]
         # Multiplicative factor of learning rate decay
-        gamma: 0.9
+        gamma: 0.5
 
         T_max: null
         eta_min: null
@@ -80,7 +80,7 @@ solver:
 
 # ==Early Stopping==
 es:
-    patience: 10
+    patience: 15
     mode: 'min'
 
 # ==Evaluator==

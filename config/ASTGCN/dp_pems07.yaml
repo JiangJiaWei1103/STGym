@@ -1,13 +1,13 @@
 # Configuration for data processing
 # ==Metadata==
-dataset_name: metr_la
+dataset_name: pems07
 
 # ==Data Processing==
 dp:
     # Time stamp encoder
     time_enc:
-      add_tid: True
-      add_diw: True
+      add_tid: False
+      add_diw: False
       n_tids: 288
       max_norm: True
 
@@ -19,19 +19,19 @@ dp:
 
     # Priori graph structure
     priori_gs:
-        type: null
+        type: laplacian
         k: null
 
     # Auxiliary data
     aux_data:
-        file_path: ["./data/raw/metr_la/SE_METR.txt"]
+        file_path: null
 
 # ==CV Scheme==
 cv:
     scheme: tssplit
     n_folds: 1
-    train_ratio: 0.875
-    val_ratio: 0.125
+    train_ratio: 0.75
+    val_ratio: 0.25
 
 # ==Dataset==
 dataset:
@@ -40,5 +40,5 @@ dataset:
     n_tids: 288         # Number of time slots in one day
     day_window: 12
     week_window: 12
-    num_of_day: null
-    num_of_week: null
+    num_of_day: 1
+    num_of_week: 1

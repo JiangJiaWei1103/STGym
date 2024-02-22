@@ -13,7 +13,7 @@ model_params:
         num_of_hour: 1
         num_of_day: 1
         num_of_week: 1
-        n_series: 207
+        n_series: 170
     device: 'cuda:0'
     out_len: 12
 
