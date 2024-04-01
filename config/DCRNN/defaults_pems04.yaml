@@ -1,0 +1,100 @@
+# Common configuration for training and evaluation processes
+# ==Training==
+seed: 168
+device: 'cuda:0'
+epochs: 100
+loss_fn:
+    # Name of the loss criterion, the choices are as follows:
+    #    {'l1', 'l2', 'mtk'}
+    name: 'ml1'
+    # Multitask coordination
+    mtk:
+        # Supervised task
+        #supr: 'l1'
+        # Regularization
+        #ae_recons: 0
+        #vq: 0
+    rescale: True
+    custom: False
+    cl: null
+clip_grad_norm: 5
+model_ckpt:
+    ckpt_metric: null
+    ckpt_mode: null
+    best_ckpt_mid: loss
+
+# ==DataLoader==
+dataloader:
+    batch_size: 32
+    shuffle: True
+    num_workers: 4
+
+# ==Solver==
+solver:
+    # ==Optimizer==
+    optimizer:
+        name: adam
+        # Learning rate
+        lr: 0.003
+        # Weight decay, default=1e-2 for AdamW
+        weight_decay: 0
+        # ==Ada* series==
+        # Term added to the denominator to improve numerical stability
+        eps: 1e-3
+        # ==Adadelta==
+        # Coefficient used for computing a running avg of squared gradients
+        rho: null
+        # ==Adagrad==
+        # Learning rate decay
+        lr_decay: null
+        # ==Adam* series==
+        # Coefficients used for computing running avg of grad and its square
+        beta1: 0.9
+        beta2: 0.999
+        #  Whether to use the AMSGrad variant
+        amsgrad: True
+        # ==SGD==
+        # Momentum factor
+        momentum: null
+        # Dampening for momentum
+        dampening: null
+        # Enable Nesterov momentum
+        nesterov: null
+
+    # ==Learning rate scheduler==
+    lr_skd:
+        name: multistep
+        milestones: [80]
+        # Multiplicative factor of learning rate decay
+        gamma: 0.3
+
+        T_max: null
+        eta_min: null
+
+        mode: min
+        factor: 0.5
+        patience: 5
+
+        # If True, step scheduler per iteration
+        step_per_batch: False
+
+# ==Early Stopping==
+es:
+    patience: 50
+    mode: 'min'
+
+# ==Evaluator==
+evaluator:
+    # Evaluation metrics, the choices are as follows:
+    #     {'mae', 'rmse', 'rae', 'rrse', 'corr', 'mmae', 'mrmse', 'mmape'}
+    # For single-step
+    #eval_metrics: ['rrse', 'corr']
+    # For multi-step
+    eval_metrics: ['mmae', 'mrmse', 'mmape']
+    # Specify cutoff in multi-horizon scenario
+    horiz_cuts: [3, 6, 12]
+
+# =Misc=
+adj_reg:
+    #update_mechanism: momentum
+    #factor: 0.99

@@ -1,0 +1,16 @@
+# Configuration file for model architecture `AGCRN`
+model_params:
+    # Spatial/Temporal pattern extractor
+    st_params:
+        num_layers: 2
+        n_series: 307
+        rnn_units: 64
+        cheb_k: 2
+        in_channels: 2
+        out_channels: 1
+    # Data Adaptive Graph Generation
+    dagg_params:
+        embedding_dim: 10
+    out_len: 12
+
+fit_params:

@@ -1,0 +1,44 @@
+# Configuration for data processing
+# ==Metadata==
+dataset_name: pems03
+
+# ==Data Processing==
+dp:
+    # Time stamp encoder
+    time_enc:
+      add_tid: True
+      add_diw: False
+      n_tids: 288
+      max_norm: True
+
+    # Holdout (fixed)
+    holdout_ratio: 0.2
+
+    # Scaling
+    scaling: standard
+
+    # Priori graph structure
+    priori_gs:
+        type: dual_random_walk
+        k: null
+
+    # Auxiliary data
+    aux_data:
+        file_path: null
+
+# ==CV Scheme==
+cv:
+    scheme: tssplit
+    n_folds: 1
+    train_ratio: 0.75
+    val_ratio: 0.25
+
+# ==Dataset==
+dataset:
+    t_window: 12
+    horizon: 12
+    n_tids: 288         # Number of time slots in one day
+    day_window: 12
+    week_window: 12
+    num_of_day: null
+    num_of_week: null
