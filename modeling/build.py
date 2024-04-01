@@ -17,13 +17,13 @@ from .Final import HARDPurG
 from .sotas.DCRNN import DCRNN
 from .sotas.STGCN import STGCN
 from .sotas.GWNet import GWNet
-from .Final_ASTGCN import ASTGCN
-from .Final_STSGCN import STSGCN
-from .Final_AGCRN import AGCRN
-from .Final_GMAN import GMAN
+from .sotas.ASTGCN import ASTGCN
+from .sotas.STSGCN import STSGCN
+from .sotas.AGCRN import AGCRN
+from .sotas.GMAN import GMAN
 from .sotas.MTGNN import MTGNN
-from .Final_DGCRN import DGCRN
-from .Final_GTS import GTS
+from .sotas.DGCRN import DGCRN
+from .sotas.GTS import GTS
 from .sotas.STNorm import STNorm
 from .sotas.STID import STID
 from .sotas.SCINet import SCINet
@@ -31,6 +31,9 @@ from .sotas.STAEformer import STAEformer
 from .sotas.MegaCRN import MegaCRN
 from .sotas.LST_Skip import LST_Skip
 from .sotas.TPA_LSTM import TPA_LSTM
+from .sotas.Linear import Linear
+from .sotas.NLinear import NLinear
+from .sotas.DLinear import DLinear
 
 
 def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
@@ -80,6 +83,12 @@ def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
         model = LST_Skip(**model_cfg)
     elif model_name == "TPA_LSTM":
         model = TPA_LSTM(**model_cfg)
+    elif model_name == "Linear":
+        model = Linear(**model_cfg)
+    elif model_name == "NLinear":
+        model = NLinear(**model_cfg)
+    elif model_name == "DLinear":
+        model = DLinear(**model_cfg)
     else:
         raise RuntimeError(f"{model_name} isn't registered.")
 
