@@ -12,6 +12,8 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
+from metadata import N_DAYS_IN_WEEK
+
 class STID(nn.Module):
     """
     STID.
@@ -119,17 +121,17 @@ class STID(nn.Module):
         input_data = x[..., range(self.input_dim)]
 
         if self.if_time_in_day:
-            t_i_d_data = x[..., 1]
+            tid_data = x[..., 1]
             # the time_of_day feature is normalized to [0, 1]. 
             # We multiply it by 288 to get the index.
             time_in_day_emb = self.time_in_day_emb[
-                (t_i_d_data[:, -1, :] * self.time_of_day_size).type(torch.LongTensor)]
+                (tid_data[:, -1, :] * self.time_of_day_size).type(torch.LongTensor)]
         else:
             time_in_day_emb = None
         if self.if_day_in_week:
-            d_i_w_data = x[..., 2]
-            day_in_week_emb = self.day_in_week_emb[(
-                d_i_w_data[:, -1, :]).type(torch.LongTensor)]
+            diw_data = x[..., 2]
+            day_in_week_emb = self.day_in_week_emb[
+                (diw_data[:, -1, :] * N_DAYS_IN_WEEK).type(torch.LongTensor)]
         else:
             day_in_week_emb = None
 

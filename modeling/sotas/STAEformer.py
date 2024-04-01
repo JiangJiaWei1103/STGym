@@ -12,6 +12,8 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
+from metadata import N_DAYS_IN_WEEK
+
 class STAEformer(nn.Module):
     def __init__(
         self,
@@ -158,7 +160,7 @@ class STAEformer(nn.Module):
         # day in week embedding
         if self.diw_embedding_dim > 0:
             dow_emb = self.diw_embedding(
-                diw.long()
+                (diw * N_DAYS_IN_WEEK).long()
             )  # (B, T, N, diw_embedding_dim)
             features.append(dow_emb)
 

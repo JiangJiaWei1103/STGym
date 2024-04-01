@@ -221,9 +221,9 @@ class GTS(nn.Module):
         Return:
             train_features: train features
         """
-        if self.dataset_name in TrafBerks:
+        try:
             data_vals = self.aux_data["data"][..., 0]
-        else:
+        except:
             data_vals = self.aux_data
         num_samples = data_vals.shape[0]
         num_train = round(num_samples * train_ratio)
