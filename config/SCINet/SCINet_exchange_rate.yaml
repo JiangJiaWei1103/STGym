@@ -1,25 +1,25 @@
 # Configuration file for model architecture `SCINet`
 model_params:
     net_params:
-        dataset_name: metr_la
-        t_window: 12
-        n_series: 207
+        dataset_name: exchange_rate
+        t_window: 168
+        n_series: 8
         num_stacks: 1
-        num_levels: 2
+        num_levels: 3
         num_decoder_layer: 2
-        output_len: 12
-        concat_len: 0
-        hid_size: 0.0625
+        output_len: 24
+        concat_len: 144
+        hid_size: 0.125
         kernel_size: 5
         groups: 1
-        dropout: 0.25
+        dropout: 0.5
         INN: True
         single_step_output_One: 0
-        positionalEcoding: True
+        positionalEcoding: False
         RIN: False
     loss_params:
         single_step: 0
-        lastWeight: 1.0
-        criterion: null
+        lastWeight: 0.5
+        criterion: smooth_l1_loss
 
 fit_params:

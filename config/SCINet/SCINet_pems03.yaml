@@ -1,9 +1,9 @@
 # Configuration file for model architecture `SCINet`
 model_params:
     net_params:
-        dataset_name: metr_la
+        dataset_name: pems03
         t_window: 12
-        n_series: 207
+        n_series: 358
         num_stacks: 1
         num_levels: 2
         num_decoder_layer: 2

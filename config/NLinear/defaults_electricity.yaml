@@ -2,7 +2,7 @@
 # ==Training==
 seed: 168
 device: 'cuda:0'
-epochs: 80
+epochs: 50
 loss_fn:
     # Name of the loss criterion, the choices are as follows:
     #    {'l1', 'l2', 'mtk'}
@@ -63,10 +63,10 @@ solver:
 
     # ==Learning rate scheduler==
     lr_skd:
-        name: exp
-        milestones: null
+        name: multistep
+        milestones: [25]
         # Multiplicative factor of learning rate decay
-        gamma: 0.95
+        gamma: 0.5
 
         T_max: null
         eta_min: null
@@ -80,7 +80,7 @@ solver:
 
 # ==Early Stopping==
 es:
-    patience: 80
+    patience: 100
     mode: 'min'
 
 # ==Evaluator==
@@ -90,9 +90,9 @@ evaluator:
     # For single-step
     #eval_metrics: ['rrse', 'corr']
     # For multi-step
-    eval_metrics: ['mmae', 'mrmse', 'mmape']
+    eval_metrics: ['rrse', 'corr']
     # Specify cutoff in multi-horizon scenario
-    horiz_cuts: [3, 6, 12]
+    horiz_cuts: [6]
 
 # =Misc=
 adj_reg:

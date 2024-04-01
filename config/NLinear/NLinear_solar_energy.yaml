@@ -1,0 +1,9 @@
+# Configuration file for model architecture `NLinear`
+model_params:
+    st_params:
+        t_window: 168
+        n_series: 137
+        individual: False
+    out_len: 24
+
+fit_params:

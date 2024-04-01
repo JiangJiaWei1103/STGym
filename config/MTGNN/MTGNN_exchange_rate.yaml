@@ -8,7 +8,7 @@ model_params:
         # Spatial
         gcn_true: True
         gcn_depth: 2
-        n_series: 321
+        n_series: 8
         propalpha: 0.05
         # Temporal
         dilation_exponential: 2      # Multi-step: 1, Single-step: 2
@@ -18,7 +18,7 @@ model_params:
     gl_params:
         buildA_true: True
         static_feature: null
-        subgraph_size: 20
+        subgraph_size: 8
         node_dim: 40
         tanhalpha: 3
     # input/output channels

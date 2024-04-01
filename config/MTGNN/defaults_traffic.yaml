@@ -2,7 +2,7 @@
 # ==Training==
 seed: 168
 device: 'cuda:0'
-epochs: 80
+epochs: 30
 loss_fn:
     # Name of the loss criterion, the choices are as follows:
     #    {'l1', 'l2', 'mtk'}
@@ -17,7 +17,7 @@ loss_fn:
     rescale: True
     custom: False
     cl: null
-clip_grad_norm: null
+clip_grad_norm: 5
 model_ckpt:
     ckpt_metric: null
     ckpt_mode: null
@@ -25,7 +25,7 @@ model_ckpt:
 
 # ==DataLoader==
 dataloader:
-    batch_size: 64
+    batch_size: 16
     shuffle: True
     num_workers: 4
 
@@ -35,9 +35,9 @@ solver:
     optimizer:
         name: adam
         # Learning rate
-        lr: 0.001
+        lr: 0.0001
         # Weight decay, default=1e-2 for AdamW
-        weight_decay: 0.0001
+        weight_decay: 0.00001
         # ==Ada* series==
         # Term added to the denominator to improve numerical stability
         eps: 1e-8
@@ -63,10 +63,10 @@ solver:
 
     # ==Learning rate scheduler==
     lr_skd:
-        name: exp
+        name: null
         milestones: null
         # Multiplicative factor of learning rate decay
-        gamma: 0.95
+        gamma: null
 
         T_max: null
         eta_min: null
@@ -80,7 +80,7 @@ solver:
 
 # ==Early Stopping==
 es:
-    patience: 80
+    patience: 30
     mode: 'min'
 
 # ==Evaluator==
@@ -90,9 +90,9 @@ evaluator:
     # For single-step
     #eval_metrics: ['rrse', 'corr']
     # For multi-step
-    eval_metrics: ['mmae', 'mrmse', 'mmape']
+    eval_metrics: ['rrse', 'corr']
     # Specify cutoff in multi-horizon scenario
-    horiz_cuts: [3, 6, 12]
+    horiz_cuts: null
 
 # =Misc=
 adj_reg:

@@ -2,7 +2,7 @@
 model_params:
     # Spatial/Temporal pattern extractor
     st_params:
-        n_series: 207
+        n_series: 170
         t_window: 12
         in_dim: 1
         hid_dim: 64

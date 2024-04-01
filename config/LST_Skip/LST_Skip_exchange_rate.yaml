@@ -4,7 +4,7 @@ model_params:
     st_params:
         hidRNN: 50
         hidCNN: 50
-        hidSkip: 10
+        hidSkip: 5
         kernel_size: 6
         skip: 24
         highway_window: 24
