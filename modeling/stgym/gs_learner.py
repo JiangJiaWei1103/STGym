@@ -17,7 +17,6 @@ class GWNetGSLearner(nn.Module):
     Parameters:
         n_nodes: number of nodes (i.e., series)
     """
-
     def __init__(self, n_nodes: int) -> None:
         super(GWNetGSLearner, self).__init__()
 
@@ -48,7 +47,6 @@ class MTGNNGSLearner(nn.Module):
         k: topk nearest neighbors are retained in sparsification
         static_feat_dim: dimension of static node features
     """
-
     def __init__(
         self, n_nodes: int, node_emb_dim: int, alpha: float, k: int, static_feat_dim: Optional[int] = None
     ) -> None:
@@ -111,7 +109,6 @@ class AGCRNGSLearner(nn.Module):
         n_nodes: number of nodes (i.e., series)
         cheb_k: order of chebyshev polynomial expansion
     """
-
     def __init__(self, n_nodes: int, cheb_k: int) -> None:
         super(AGCRNGSLearner, self).__init__()
 
@@ -141,7 +138,6 @@ class AGCRNGSLearner(nn.Module):
 
 class MegaCRNGSLearner(nn.Module):
     """Graph structure learner of MegaCRN."""
-
     def __init__(self) -> None:
         super(MegaCRNGSLearner, self).__init__()
 
@@ -165,9 +161,9 @@ class MegaCRNGSLearner(nn.Module):
 
 class GTSGSLearner(nn.Module):
     """Graph structure learner of GTS."""
-
     def __init__(self, n_series: int, node_features: Tensor, temperature: int) -> None:
         super(GTSGSLearner, self).__init__()
+        
         # Network parameters
         self.n_series = n_series
         self.temperature = temperature

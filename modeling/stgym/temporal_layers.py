@@ -18,7 +18,6 @@ class GatedTCN(nn.Module):
     Parameters:
         conv_module: customized convolution module
     """
-
     def __init__(
         self,
         in_dim: int,
@@ -78,7 +77,6 @@ class DilatedInception(nn.Module):
 
     Note that `out_channels` will be split across #kernels.
     """
-
     def __init__(self, in_channels: int, out_channels: int, kernel_size: List[int], dilation: int) -> None:
         super(DilatedInception, self).__init__()
 

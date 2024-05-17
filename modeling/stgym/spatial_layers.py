@@ -15,7 +15,6 @@ from .common_layers import Linear2d, Align
 # Spatial pattern extractor
 class DiffusionConvLayer(nn.Module):
     """Diffusion convolutional layer."""
-
     def __init__(
         self, in_dim: int, h_dim: int, n_adjs: int = 2, max_diffusion_step: int = 2
     ) -> None:
@@ -81,7 +80,6 @@ class InfoPropLayer(nn.Module):
             {"src_to_tgt", "tgt_to_src"}
         mix_prop: if True, mix-hop propagation in MTGNN is used
     """
-
     def __init__(
         self,
         in_dim: int,
@@ -155,7 +153,6 @@ class GCN2d(nn.Module):
     GCN2d applies graph convolution over graph signal represented by
     2D node embedding planes.
     """
-
     def __init__(
         self,
         flow: str = "src_to_tgt",
