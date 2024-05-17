@@ -38,7 +38,3 @@ dataset:
     t_window: 12
     horizon: 12
     n_tids: 288         # Number of time slots in one day
-    day_window: 12
-    week_window: 12
-    num_of_day: null
-    num_of_week: null

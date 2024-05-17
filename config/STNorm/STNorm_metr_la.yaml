@@ -2,22 +2,18 @@
 model_params:
     # Spatial/Temporal Convolution Module
     st_params:
-        blocks: 1
-        layers: 4
-        # Spatial
-        n_series: 207
-        # Temporal
-        dilation_exponential: 2
+        n_layers: 4
+        tcn_in_dim: 32
+        gcn_in_dim: 32
         kernel_size: 2
-        t_window: 12
-    # input/output channels
-    ch_params:
-        hid_channels: 32
-        in_channels: 2
-    # ST-Norm
-    stnorm_params:
-        tnorm_bool: True
-        snorm_bool: True
+        dilation_factor: 2
+        snorm: True
+        tnorm: True
+        bn: False
+    in_dim: 2
+    skip_dim: 32
+    end_dim: 32
     out_len: 12
+    n_series: 207
 
 fit_params:

@@ -64,7 +64,7 @@ solver:
     # ==Learning rate scheduler==
     lr_skd:
         name: multistep
-        milestones: [20,30]
+        milestones: [20, 30]
         # Multiplicative factor of learning rate decay
         gamma: 0.1
 

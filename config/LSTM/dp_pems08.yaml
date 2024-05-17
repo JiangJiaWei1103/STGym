@@ -1,15 +1,15 @@
 # Configuration for data processing
 # ==Metadata==
-dataset_name: metr_la
+dataset_name: pems08
 
 # ==Data Processing==
 dp:
     # Time stamp encoder
     time_enc:
       add_tid: True
-      add_diw: True
+      add_diw: False
       n_tids: 288
-      max_norm: False
+      max_norm: True
 
     # Holdout (fixed)
     holdout_ratio: 0.2
@@ -30,15 +30,11 @@ dp:
 cv:
     scheme: tssplit
     n_folds: 1
-    train_ratio: 0.875
-    val_ratio: 0.125
+    train_ratio: 0.75
+    val_ratio: 0.25
 
 # ==Dataset==
 dataset:
     t_window: 12
     horizon: 12
     n_tids: 288         # Number of time slots in one day
-    day_window: 12
-    week_window: 12
-    num_of_day: null
-    num_of_week: null

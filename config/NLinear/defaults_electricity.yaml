@@ -92,7 +92,7 @@ evaluator:
     # For multi-step
     eval_metrics: ['rrse', 'corr']
     # Specify cutoff in multi-horizon scenario
-    horiz_cuts: [6]
+    horiz_cuts: [3]
 
 # =Misc=
 adj_reg:

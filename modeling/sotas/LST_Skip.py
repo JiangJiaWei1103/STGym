@@ -15,85 +15,69 @@ from torch import Tensor
 import torch.nn.functional as F
 
 class LST_Skip(nn.Module):
-    """
-    LST-Skip.
+    """LST-Skip framework.
 
     Parameters:
-        hidRNN: hidden dimension of RNN
-        hidCNN: hidden dimension of CNN
-        hidSkip: hidden dimension of Skip-RNN
-        kernel_size: kernel size
-        skip: number of hidden cells skipped through
-        highway_window: time window for Autoregressive component
-        t_window: lookback time window
-        n_series: number of nodes
-        dropout: dropout ratio
-        output_act: activation function of the final output
+        in_dim: input dimension
+        in_len: input sequence length
         out_len: output sequence length
+        n_series: number of series
+        rnn_h_dim: hidden dimension of RNN
+        cnn_h_dim: hidden dimension of CNN
+        skip_h_dim: hidden dimension of Skip-RNN
+        kernel_size: kernel size
+        n_skip: number of hidden cells skipped through
+        ar_window: autoregressive lookback time window
+        dropout: dropout ratio
+        act: activation function of the output layer
     """
-    def __init__(
-        self,
-        st_params: Dict[str, Any],
-        out_len: int
-    ):
+    def __init__(self, in_dim: int, in_len: int, out_len: int, n_series: int, st_params: Dict[str, Any]) -> None:
+        self.name = self.__class__.__name__
         super(LST_Skip, self).__init__()
 
         # Network parameters
         self.st_params = st_params
-        self.out_len = out_len
-        # hyperparameters of Spatial/Temporal pattern extractor
-        self.hidR = self.st_params['hidRNN']
-        self.hidC = self.st_params['hidCNN']
-        self.hidS = self.st_params['hidSkip']
-        self.k = self.st_params['kernel_size']
-        self.skip = self.st_params['skip']
-        self.hw = self.st_params['highway_window']
-        self.t_window = self.st_params['t_window']
-        self.n_series = self.st_params['n_series']
-        dropout_ratio = self.st_params['dropout']
-        output_act = self.st_params['output_act']
+        # Spatio-temporal pattern extractor
+        rnn_h_dim = st_params["rnn_h_dim"]
+        self.cnn_h_dim = st_params["cnn_h_dim"]
+        self.skip_h_dim = st_params["skip_h_dim"]
+        kernel_size = st_params["kernel_size"]
+        self.n_skip = st_params["n_skip"]
+        self.ar_window = st_params["ar_window"]
+        dropout = st_params["dropout"]
+        act = st_params["act"]
+        self.n_series = n_series
+        self.pt = math.floor((in_len - kernel_size) / self.n_skip)
 
-        self.pt = math.floor((self.t_window - self.k) / self.skip)
-
-        # CNN, Convolutional Component
-        self.conv = nn.Conv2d(
-            1,
-            self.hidC,
-            kernel_size = (self.k, self.n_series))
-        
-        # RNN, Recurrent Component
-        self.GRU = nn.GRU(self.hidC, self.hidR)
-
-        self.dropout = nn.Dropout(p = dropout_ratio)
-
-        # Skip-RNN, Recurrent-skip Component
-        if (self.skip > 0):
-            self.GRUskip = nn.GRU(self.hidC, self.hidS)
-            self.linear = nn.Linear(self.hidR + self.skip * self.hidS, self.n_series)
+        # Model blocks
+        # CNN
+        self.conv = nn.Conv2d(in_channels=in_dim, out_channels=self.cnn_h_dim, kernel_size=(kernel_size, n_series))
+        # RNN
+        self.GRU = nn.GRU(self.cnn_h_dim, rnn_h_dim)
+        self.dropout = nn.Dropout(p=dropout)
+        # Recurrent-skip Component
+        if (self.n_skip > 0):
+            self.GRUskip = nn.GRU(self.cnn_h_dim, self.skip_h_dim)
+            self.linear = nn.Linear(rnn_h_dim + self.n_skip * self.skip_h_dim, n_series)
         else:
-            self.linear = nn.Linear(self.hidR, self.n_series)
-
+            self.linear = nn.Linear(rnn_h_dim, n_series)
         # Autoregressive Component
-        if (self.hw > 0):
-            self.highway = nn.Linear(self.hw, out_len)
+        if (self.ar_window > 0):
+            self.ar_linear = nn.Linear(self.ar_window, out_len)
             
-        self.output = None
-        if (output_act == 'sigmoid'):
-            self.output = F.sigmoid
-        if (output_act == 'tanh'):
-            self.output = F.tanh
+        if act is not None:
+            if act == "sigmoid":
+                self.act = F.sigmoid
+            if act == "tanh":
+                self.act = F.tanh
+        else:
+            self.act = None
  
-    def forward(
-        self,
-        x: Tensor,
-        As: Optional[List[Tensor]] = None,
-        **kwargs: Any,
-    ) -> Tuple[Tensor, None, None]:
-        """
-        Forward pass.
+    def forward(self, x: Tensor, As: Optional[List[Tensor]] = None, **kwargs: Any) -> Tuple[Tensor, None, None]:
+        """Forward pass.
 
         Parameters:
-            x: input hour features
+            x: input sequence
 
         Shape:
             x: (B, P, N, C)
@@ -101,40 +85,36 @@ class LST_Skip(nn.Module):
         """
         batch_size = x.size(0)
         
-        # CNN, Convolutional Component
-        c = x.permute(0, 3, 1, 2)   # (B, C, P, N)
-        c = F.relu(self.conv(c))    # (B, hidC, L, 1)
-        c = self.dropout(c)
-        c = torch.squeeze(c, 3)     # (B, hidC, L)
+        # CNN
+        h_c = x.permute(0, 3, 1, 2)   # (B, C, P, N)
+        h_c = self.dropout(F.relu(self.conv(h_c))).squeeze(dim=-1)    # (B, cnn_h_dim, L)
         
-        # RNN, Recurrent Component
-        r = c.permute(2, 0, 1).contiguous()     # (L, B, hidC)
-        _, r = self.GRU(r)
-        r = self.dropout(torch.squeeze(r, 0))   # (B, hidR)
-
+        # RNN
+        h_r = h_c.permute(2, 0, 1).contiguous()     # (L, B, cnn_h_dim)
+        _, h_r = self.GRU(h_r)
+        h_r = self.dropout(h_r.squeeze(dim=0))      # (B, rnn_h_dim)
         
-        # Skip-RNN, Recurrent-skip Component
-        if (self.skip > 0):
-            s = c[:,:, int(-self.pt * self.skip):].contiguous()
-            s = s.view(batch_size, self.hidC, self.pt, self.skip)
-            s = s.permute(2,0,3,1).contiguous()
-            s = s.view(self.pt, batch_size * self.skip, self.hidC)
-            _, s = self.GRUskip(s)
-            s = s.view(batch_size, self.skip * self.hidS)
-            s = self.dropout(s)
-            r = torch.cat((r, s), 1)    # (B, hidR+skip*hidS)
-        
-        res = self.linear(r)    # (B, N)
+        # Recurrent-skip Component
+        if (self.n_skip > 0):
+            h_s = h_c[:,:, int(-self.pt * self.n_skip):].contiguous()
+            h_s = h_s.view(batch_size, self.cnn_h_dim, self.pt, self.n_skip)
+            h_s = h_s.permute(2,0,3,1).contiguous()
+            h_s = h_s.view(self.pt, batch_size * self.n_skip, self.cnn_h_dim)
+            _, h_s = self.GRUskip(h_s)
+            h_s = h_s.view(batch_size, self.n_skip * self.skip_h_dim)
+            h_s = self.dropout(h_s)
+            h = torch.cat((h_r, h_s), 1)    # (B, rnn_h_dim + n_skip * skip_h_dim)
+        output = self.linear(h)    # (B, N)
         
         # Autoregressive Component
-        if (self.hw > 0):
-            z = x.squeeze(-1)[:, -self.hw:, :]                      # (B, hw, N)
-            z = z.permute(0,2,1).contiguous().view(-1, self.hw)     # (B*N, hw)
-            z = self.highway(z)                                     # (B*N, 1)
-            z = z.view(-1,self.n_series)                            # (B, N)
-            res = res + z                                           # (B, N)
+        if (self.ar_window > 0):
+            h_a = x.squeeze(-1)[:, -self.ar_window:, :]                      # (B, hw, N)
+            h_a = h_a.permute(0,2,1).contiguous().view(-1, self.ar_window)   # (B * N, hw)
+            h_a = self.ar_linear(h_a)                                        # (B * N, 1)
+            h_a = h_a.view(-1, self.n_series)                                # (B, N)
+            output = output + h_a                                            # (B, N)
             
-        if (self.output):
-            res = self.output(res)
+        if self.act is not None:
+            output = self.act(h)
 
-        return res, None, None
+        return output, None, None

@@ -11,67 +11,61 @@ from typing import List, Dict, Any, Optional, Tuple
 import torch
 import torch.nn as nn
 from torch import Tensor
-import torch.nn.functional as F
+
+from modeling.stgym.layers import AGCGRU
+from modeling.stgym.gs_learner import AGCRNGSLearner
 
 class AGCRN(nn.Module):
-    """
-    AGCRN.
+    """AGCRN framework.
 
     Parameters:
-        num_layers: number of AGCRN layers
-        n_series: number of nodes`
-        rnn_units: hidden dimension of rnn
-        cheb_k: order of chebyshev polynomial expansion
-        in_channels: dimension of input channels
-        out_channels: dimension of output channels
-        embedding_dim: dimension of node embedding
+        in_dim: input feature dimension
+        out_dim: output dimension
         out_len: output sequence length
+        n_layers: number of AGCRN layers
+        h_dim: hidden dimension
+        cheb_k: order of chebyshev polynomial expansion
+        n_series: number of series
+        emb_dim: dimension of node embedding
     """
     def __init__(
-        self,
-        st_params: Dict[str, Any],
-        dagg_params: Dict[str, Any],
-        out_len: int,
-    ):
+        self, in_dim: int, out_dim: int, out_len: int, st_params: Dict[str, Any], dagg_params: Dict[str, Any],
+    ) -> None:
+        self.name = self.__class__.__name__
         super(AGCRN, self).__init__()
 
         # Network parameters
         self.st_params = st_params
         self.dagg_params = dagg_params
-        self.out_len = out_len
-
-        # hyperparameters of Spatial/Temporal pattern extractor
-        num_layers = self.st_params['num_layers']
-        rnn_units = self.st_params['rnn_units']
-        cheb_k = self.st_params['cheb_k']
-        in_channels = self.st_params['in_channels']
-        self.out_channels = self.st_params['out_channels']
+        # Spatio-temporal pattern extractor
+        n_layers = st_params["n_layers"]
+        h_dim = st_params["h_dim"]
+        cheb_k = st_params["cheb_k"]
         self.n_series = self.st_params['n_series']
-        # hyperparameters of Data Adaptive Graph Generation
-        self.embedding_dim = self.dagg_params['embedding_dim']
+        # Data Adaptive Graph Generation
+        emb_dim = dagg_params["emb_dim"]
+        self.out_len = out_len
+        self.out_dim = out_dim
 
-        self.hidden_dim = rnn_units
-
-        # node-embedding matrix
-        self.node_embeddings = nn.Parameter(
-            torch.randn(self.n_series, self.embedding_dim),
-            requires_grad = True)
-
-        # Adaptive Graph Convolutional Recurrent Network
-        self.encoder = _AVWDCRNN(
-            self.n_series, 
-            in_channels, 
-            rnn_units, 
-            cheb_k,
-            self.embedding_dim,
-            num_layers)
-
-        # predictor
-        self.end_conv = nn.Conv2d(
-            1, 
-            self.out_len * self.out_channels, 
-            kernel_size = (1, self.hidden_dim), 
-            bias=True)
+        # Model blocks
+        # Node embedding matrix
+        self.node_embs = nn.Parameter(torch.randn(self.n_series, emb_dim))
+        # Data Adaptive Graph Generation
+        self.gs_learner = AGCRNGSLearner(self.n_series, cheb_k)
+        # Encoder
+        self.encoder = _Encoder(
+            in_dim=in_dim,
+            h_dim=h_dim,
+            emb_dim=emb_dim,
+            n_layers=n_layers,
+            cheb_k=cheb_k
+        )
+        # Output layer
+        self.output = nn.Conv2d(
+            in_channels=1, 
+            out_channels=out_len * out_dim, 
+            kernel_size = (1, h_dim)
+        )
         
         self._reset_parameters()
          
@@ -82,271 +76,60 @@ class AGCRN(nn.Module):
             else:
                 nn.init.uniform_(p)
 
-    def forward(
-        self, 
-        source: Tensor, 
-        As: Optional[List[Tensor]] = None,
-        teacher_forcing_ratio: float = 0.5,
-        **kwargs: Any,
-    ) -> Tuple[Tuple, None, None]:
-        """
-        Forward pass.
+    def forward(self, x: Tensor, As: Optional[List[Tensor]] = None, **kwargs: Any) -> Tuple[Tuple, None, None]:
+        """Forward pass.
 
         Parameters:
-            source: input features
-        
-        Return:
-            output: prediction
-        
+            x: input sequence
+            As: list of adjacency matrices
+
         Shape:
-            source: (B, T, N, C)
-            output: (B, out_len, N)
+            x: (B, P, N, C)
+            output: (B, Q, N)
         """
-        batch_size = source.shape[0]
-        init_state = self.encoder.init_hidden(batch_size)
+        # Data Adaptive Graph Generation
+        As = self.gs_learner(self.node_embs)
+        # Encoder
+        h = self.encoder(x, self.node_embs, As)   # (B, T, N, D)
+        h = h[:, -1:, :, :]                       # (B, 1, N, D)
 
-        # Adaptive Graph Convolutional Recurrent Network
-        output, _ = self.encoder(source, init_state, self.node_embeddings)   # (B, T, N, D)
-        output = output[:, -1:, :, :]                                        # (B, 1, N, D)
-
-        # CNN based predictor
-        output = self.end_conv(output)       # (B, out_len*C, N, 1)
-        output = output.squeeze(-1).reshape(-1, self.out_len, self.out_channels, self.n_series)
-        output = output.permute(0, 1, 3, 2).squeeze(3)   # (B, T, N)
+        # Output layer
+        output = self.output(h).squeeze(dim=-1)           # (B, out_len * out_dim, N)
+        output = output.reshape(-1, self.out_len, self.out_dim, self.n_series)
+        output = output.squeeze(dim=2)   # (B, Q, N)
 
         return output, None, None
-
-class _AVWDCRNN(nn.Module):
-    """
-    Adaptive Graph Convolutional Recurrent Network.
-
-    Parameters:
-        n_series: number of nodes
-        dim_in: dimension of input features
-        dim_out: dimension of output features
-        cheb_k: order of chebyshev polynomial expansion
-        embedding_dim: dimension of node embedding
-        num_layers: number of layers
-    """
-    def __init__(
-        self, 
-        n_series: int, 
-        dim_in: int, 
-        dim_out: int, 
-        cheb_k: int, 
-        embedding_dim: int, 
-        num_layers: int = 1
-    ):
-        super(_AVWDCRNN, self).__init__()
-
-        assert num_layers >= 1, 'At least one DCRNN layer in the Encoder.'
-
-        self.n_series = n_series
-        self.input_dim = dim_in
-        self.num_layers = num_layers
-        self.dcrnn_cells = nn.ModuleList()
-
-        self.dcrnn_cells.append(_AGCRNCell(n_series, dim_in, dim_out, cheb_k, embedding_dim))
-        for _ in range(1, num_layers):
-            self.dcrnn_cells.append(_AGCRNCell(n_series, dim_out, dim_out, cheb_k, embedding_dim))
-
-    def forward(
-        self, 
-        x: Tensor, 
-        init_state: Tensor, 
-        node_embeddings: Tensor
-    ) -> Tuple[Tensor, Tensor]:
-        """
-        Forward pass.
-
-        Parameters:
-            x: input features
-            init_state: initialized hidden state
-            node_embeddings: node embeddings
-        
-        Return:
-            current_inputs: the outputs of last layer
-            output_hidden: the last state for each layer
-        
-        Shape:
-            x: (B, T, N, C)
-            init_state: (num_layers, B, N, D)
-            current_inputs: (B, T, N, D)
-            output_hidden: (num_layers, B, N, D)
-        """
-  
-        assert x.shape[2] == self.n_series and x.shape[3] == self.input_dim
-
-        t_window = x.shape[1]
-        current_inputs = x
-        output_hidden = []
-
-        for i in range(self.num_layers):
-            state = init_state[i]
-            inner_states = []
-            for t in range(t_window):
-                state = self.dcrnn_cells[i](current_inputs[:, t, :, :], state, node_embeddings)
-                inner_states.append(state)
-            output_hidden.append(state)
-            current_inputs = torch.stack(inner_states, dim = 1)
-
-        return current_inputs, output_hidden
-
-    def init_hidden(
-        self, 
-        batch_size: int
-    ) -> Tensor:
-        '''Initialization of hidden state.'''
-        init_states = []
-        for i in range(self.num_layers):
-            init_states.append(self.dcrnn_cells[i].init_hidden_state(batch_size))
-        return torch.stack(init_states, dim = 0)      #(num_layers, B, N, D)
-
-class _AGCRNCell(nn.Module):
-    """
-    Adaptive Graph Convolutional Recurrent Cell.
-
-    Parameters:
-        n_series: number of nodes
-        dim_in: dimension of input features
-        dim_out: dimension of output features
-        cheb_k: order of chebyshev polynomial expansion
-        embedding_dim: dimension of node embedding
-
-    """
-    def __init__(
-        self, 
-        n_series: int, 
-        dim_in: int, 
-        dim_out: int, 
-        cheb_k: int, 
-        embedding_dim: int
-    ):
-        super(_AGCRNCell, self).__init__()
-
-        self.n_series = n_series
-        self.hidden_dim = dim_out
-
-        self.gate = _AVWGCN(
-            dim_in + self.hidden_dim, 
-            2 * dim_out, 
-            cheb_k, 
-            embedding_dim)
-        self.update = _AVWGCN(
-            dim_in + self.hidden_dim, 
-            dim_out, 
-            cheb_k, 
-            embedding_dim)
-
-    def forward(
-        self, 
-        x: Tensor, 
-        state: Tensor, 
-        node_embeddings: Tensor
-    ) -> Tensor:
-        """
-        Forward pass.
-
-        Parameters:
-            x: input features
-            state: hidden state
-            node_embeddings: node embeddings
-        
-        Return:
-            h: current satae
-
-        Shape:
-            x: (B, N, C)
-            state: (B, N, D)
-            h: (B, N, D)
-        """
-
-        state = state.to(x.device)
-        input_and_state = torch.cat((x, state), dim = -1)   # Concat along channel
-
-        # GRU
-        z_r = torch.sigmoid(self.gate(input_and_state, node_embeddings))
-        z, r = torch.split(z_r, self.hidden_dim, dim = -1)
-        candidate = torch.cat((x, (z * state)), dim = -1)
-        hc = torch.tanh(self.update(candidate, node_embeddings))
-        h = r * state + (1 - r) * hc
-
-        return h
     
-    def init_hidden_state(
-        self, 
-        batch_size: int
-    ) -> Tensor:
-        '''
-        Initialization of hidden state.
-        '''
-        return torch.zeros(batch_size, self.n_series, self.hidden_dim)
+class _Encoder(nn.Module):
+    """AGCRN encoder."""
+    def __init__(self, in_dim: int, h_dim: int, emb_dim: int, n_layers: int, cheb_k: int = 2) -> None:
+        super(_Encoder, self).__init__()
 
-class _AVWGCN(nn.Module):
-    """
-    Node Adaptive Parameter Learning-GCN (NAPL-GCN).
+        # Model blocks
+        self.encoder = nn.ModuleList()
+        for layer in range(n_layers):
+            in_dim = in_dim if layer == 0 else h_dim
+            self.encoder.append(
+                AGCGRU(in_dim=in_dim, h_dim=h_dim, emb_dim=emb_dim, cheb_k=cheb_k)
+            )
 
-    Parameters:
-        dim_in: dimension of input features
-        dim_out: dimension of output features
-        cheb_k: order of chebyshev polynomial expansion
-        embedding_dim: dimension of node embedding
-    """
-    def __init__(
-        self, 
-        dim_in: int, 
-        dim_out: int, 
-        cheb_k: int, 
-        embedding_dim: int
-    ):
-        super(_AVWGCN, self).__init__()
-
-        self.cheb_k = cheb_k
-        self.weights_pool = nn.Parameter(torch.FloatTensor(embedding_dim, cheb_k, dim_in, dim_out))
-        self.bias_pool = nn.Parameter(torch.FloatTensor(embedding_dim, dim_out))
-
-    def forward(
-        self, 
-        x: Tensor, 
-        node_embeddings: Tensor
-    ) -> Tensor:
-        """
-        Forward pass.
+    def forward(self, x: Tensor, node_emb: Tensor, As: Tensor) -> Tensor:
+        """Forward pass.
 
         Parameters:
-            x: input features
-            node_embeddings: node embeddings
+            x: input seqeunce
+            As: adjacency matrix
 
         Return:
-            x_gconv: hidden state for all nodes
-        
+            hs: layer-wise last hidden state
+
         Shape:
-            x: (B, N, C)
-            node_embeddings: (N, D)
-            x_gconv: (B, N, C')
+            x: (B, P, N, C)
+            As: (cheb_k, N, N)
+            hs: (B, L, N, h_dim)
         """
+        hs = x
+        for encoder_layer in self.encoder:
+            hs, _ = encoder_layer(hs, node_emb, As, h_0=None)  # (B, L, N, h_dim)
 
-        n_series = node_embeddings.shape[0]
-
-        # Data Adaptive Graph Generation
-        # supports: (N, N)
-        supports = F.softmax(F.relu(torch.mm(node_embeddings, node_embeddings.transpose(0, 1))), dim = 1)
-        support_set = [torch.eye(n_series).to(supports.device), supports]
-
-        for k in range(2, self.cheb_k):
-            support_set.append(torch.matmul(2 * supports, support_set[-1]) - support_set[-2])
-
-        supports = torch.stack(support_set, dim = 0)
-
-        #  NAPL-GCN
-        # (N, cheb_k, dim_in, dim_out)
-        weights = torch.einsum('nd,dkio->nkio', (node_embeddings, self.weights_pool))
-        # (N, dim_out)
-        bias = torch.matmul(node_embeddings, self.bias_pool)
-
-        # (B, cheb_k, N, dim_in)
-        x_g = torch.einsum("knm,bmc->bknc", supports, x).permute(0, 2, 1, 3)
-        # (B, N, dim_out)
-        x_gconv = torch.einsum('bnki,nkio->bno', x_g, weights) + bias
-
-        return x_gconv
+        return hs

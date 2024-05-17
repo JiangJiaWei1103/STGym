@@ -1,20 +1,15 @@
 # Configuration file for model architecture `TPA-LSTM`
 model_params:
-    # Network parameters
-    net_params:
-        n_series: 321
-        t_window: 168
-    # RNN
-    rnn_params:
-        linear_h_dim: 321
+    # Spatial/Temporal pattern extractor
+    st_params:
+        lin_h_dim: 321
         rnn_h_dim: 45
         rnn_n_layers: 3
         rnn_dropout: 0
-    # CNN
-    cnn_params:
-        conv_out_ch: 32
-    # Autoregressive
-    ar_params:
+        cnn_h_dim: 32
         ar_window: 24
+    in_len: 168
     out_len: 1
+    n_series: 321
+
 fit_params:

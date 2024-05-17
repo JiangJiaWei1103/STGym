@@ -2,19 +2,15 @@
 model_params:
     # Spatial/Temporal pattern extractor
     st_params:
-        num_layer: 3
-        n_series: 207
-        t_window: 12
-        input_dim: 3
-        node_dim: 32
-        embed_dim: 32
-        temp_dim_tid: 32
-        temp_dim_diw: 32
-        if_time_in_day: True
-        if_day_in_week: True
-        if_spatial: True
-        time_of_day_size: 288
-        day_of_week_size: 7
+        n_layers: 3
+        lin_h_dim: 32
+        node_emb_dim: 32
+        tid_emb_dim: 32
+        diw_emb_dim: 32
+        n_tids: 288
+    in_dim: 3
+    in_len: 12
     out_len: 12
+    n_series: 207
 
 fit_params:

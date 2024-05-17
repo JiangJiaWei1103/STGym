@@ -2,26 +2,19 @@
 model_params:
     # Spatial/Temporal Convolution Module
     st_params:
-        blocks: 4
-        layers: 2
-        dropout: 0.3
-        # Spatial
-        adpadj: True
-        gcn_true: True
+        n_layers: 8
+        tcn_in_dim: 32
+        gcn_in_dim: 32
+        kernel_size: 3
+        dilation_factor: [1, 2, 1, 2, 1, 2, 1, 2]
         n_adjs: 3
         gcn_depth: 2
-        n_series: 307
-        # Temporal
-        t_window: 12
-        dilation_exponential: 2
-        kernel_size: 2
-    # input/output channels
-    ch_params:
-        dilation_channels: 32
-        residual_channels: 32
-        skip_channels: 256
-        end_channels: 512
-        in_channels: 2
+        gcn_dropout: 0.3
+        bn: True
+    in_dim: 2
+    skip_dim: 256
+    end_dim: 512
     out_len: 12
+    n_series: 307
 
 fit_params:

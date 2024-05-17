@@ -6,329 +6,141 @@ Reference:
 * Paper: https://dl.acm.org/doi/10.1145/3447548.3467330
 * Code: https://github.com/JLDeng/ST-Norm
 """
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Tuple
 
 import torch
 import torch.nn as nn
 from torch import Tensor
 import torch.nn.functional as F
 
+from modeling.stgym.layers import GWNetLayer
+from modeling.stgym.common_layers import Linear2d, SNorm, TNorm
+
+
 class STNorm(nn.Module):
-    """
-    ST-Norm.
+    """STNorm framework.
 
     Parameters:
-        blocks: number of wavenet blocks
-        layers: number of wavenet layers
-        n_series: number of nodes
-        t_window: lookback time window
-        dilation_exponential: dilation exponential
-        kernel_size: kernel size
-        hid_channels: dimension of hidden channel
-        in_channels: dimension of input channel
-        tnorm_bool: whether to add temporal normalization
-        snorm_bool: whether to add spatial normalization
+        in_dim: input feature dimension
+        skip_dim: output dimension of skip connection
+        end_dim: hidden dimension of output layer
         out_len: output sequence length
+        n_series: number of series
+        n_layers: number of GWNet layers
+        tcn_in_dim: input dimension of GatedTCN
+        gcn_in_dim: input dimension of GCN2d
+        kernel_size: kernel size
+        dilation_factor: layer-wise dilation factor or exponential base
+        bn: if True, apply batch normalization to output node embedding
+            of graph convolution
     """
     def __init__(
-        self,
-        st_params: Dict[str, Any],
-        ch_params: Dict[str, Any],
-        stnorm_params: Dict[str, Any],
-        out_len: int
-    ):
+        self, in_dim: int, skip_dim: int, end_dim: int, out_len: int, n_series: int, st_params: Dict[str, Any]
+    ) -> None:
+        self.name = self.__class__.__name__
         super(STNorm, self).__init__()
 
         # Network parameters
         self.st_params = st_params
-        self.ch_params = ch_params
-        self.stnorm_params = stnorm_params
+        n_layers = st_params["n_layers"]
+        tcn_in_dim = st_params["tcn_in_dim"]
+        gcn_in_dim = st_params["gcn_in_dim"]
+        kernel_size = st_params["kernel_size"]
+        dilation_factor = st_params["dilation_factor"]
+        self.snorm = st_params["snorm"]
+        self.tnorm = st_params["tnorm"]
+        bn = st_params["bn"]
+        if isinstance(dilation_factor, list):
+            assert len(dilation_factor) == n_layers, "Layer-wise dilation factors aren't aligned."
+        out_dim = out_len
 
-        # hyperparameters of Spatial/Temporal Convolution Module
-        self.blocks = self.st_params["blocks"]
-        self.layers = self.st_params["layers"]
-        n_series  = self.st_params["n_series"]
-        self.t_window = self.st_params["t_window"]
-        dilation_exponential = self.st_params["dilation_exponential"]
-        kernel_size = self.st_params["kernel_size"]
-        # hyperparameters of input/output channels
-        hid_channels = self.ch_params["hid_channels"]
-        in_channels = self.ch_params["in_channels"]
-        # hyperparameters of Spatial/Temporal normalization
-        tnorm_bool = self.stnorm_params['tnorm_bool']
-        snorm_bool = self.stnorm_params['snorm_bool']
+        # Model blocks
+        # Input linear layer
+        self.in_lin = Linear2d(in_dim, tcn_in_dim)
 
-        self.gwnet_layers = nn.ModuleList()
-
-        # linear layer for input transform
-        self.start_conv = nn.Conv2d(
-            in_channels=in_channels,
-            out_channels=hid_channels,
-            kernel_size=(1,1))
-
-        receptive_field = 1
-
-        # Graph wavenet layers
-        for b in range(self.blocks):
-            additional_scope = kernel_size - 1
-            new_dilation = 1
-            for i in range(self.layers):
-                self.gwnet_layers.append(
-                    _WaveNetLayer(
-                        new_dilation,
-                        kernel_size,
-                        hid_channels,
-                        n_series,
-                        tnorm_bool,
-                        snorm_bool
-                    ))
-                new_dilation *= dilation_exponential
-                receptive_field += additional_scope
-                additional_scope *= dilation_exponential
-        
-        # linear layer for the output of GWNet layer
-        self.end_conv_1 = nn.Conv2d(
-            in_channels=hid_channels,
-            out_channels=hid_channels,
-            kernel_size=(1,1),
-            bias=True)
-
-        self.end_conv_2 = nn.Conv2d(
-            in_channels=hid_channels,
-            out_channels=out_len,
-            kernel_size=(1,1),
-            bias=True)
-
-        self.receptive_field = receptive_field
-
-        self._reset_parameters()
-         
-    def _reset_parameters(self) -> None:
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+        # Stacked spatio-temporal layers
+        self._receptive_field = 1
+        self.snorm_layers = nn.ModuleList()
+        self.tnorm_layers = nn.ModuleList()
+        self.wavenet_layers = nn.ModuleList()
+        self.skip_convs = nn.ModuleList()
+        for layer in range(n_layers):
+            if isinstance(dilation_factor, list):
+                d = dilation_factor[layer]
             else:
-                nn.init.uniform_(p)
+                d = pow(dilation_factor, layer)
+            self._receptive_field += d * (kernel_size - 1)
 
-    def forward(self,
-        input: Tensor,
-        As: Optional[List[Tensor]] = None,
-        **kwargs: Any,
-    ) -> Tuple[Tensor, None, None]:
-        """
-        Forward pass.
+            # ST-Norm
+            if self.snorm:
+                self.snorm_layers.append(SNorm(in_dim=tcn_in_dim))
+            if self.tnorm:
+                self.tnorm_layers.append(TNorm(in_dim=tcn_in_dim, n_series=n_series))
+            in_dim = (1 + int(self.tnorm) + int(self.snorm)) * tcn_in_dim
+
+            self.wavenet_layers.append(
+                GWNetLayer(
+                    in_dim=in_dim,
+                    h_dim=gcn_in_dim,
+                    kernel_size=kernel_size,
+                    dilation_factor=d,
+                    gcn = False,
+                    bn=bn,
+                )
+            )
+            self.skip_convs.append(Linear2d(gcn_in_dim, skip_dim))
+
+        # Output layer
+        self.output = nn.Sequential(nn.ReLU(), Linear2d(skip_dim, end_dim), nn.ReLU(), Linear2d(end_dim, out_dim))
+
+    def forward(self, x: Tensor, As: List[Tensor], **kwargs: Any) -> Tuple[Tensor, None, None]:
+        """Forward pass.
 
         Parameters:
-            x: node feature matrix
+            x: input sequence
+            As: list of adjacency matrices
 
         Return:
             output: prediction
 
         Shape:
             x: (B, P, N, C)
-            output: (B, out_len, N)
+            As: each A with shape (N, N)
+            output: (B, Q, N)
         """
-        input = input.permute(0, 3, 2, 1)
+        # Input linear layer
+        x = x.permute(0, 3, 2, 1)  # (B, C, N, P)
+        x = self._pad_seq_to_receptive(x)
+        x = self.in_lin(x)
 
-        if self.t_window < self.receptive_field:
-            x = nn.functional.pad(input, (self.receptive_field - self.t_window,0,0,0))
-        else:
-            x = input
+        # Stacked spatio-temporal layers
+        x_skips = []
+        for layer, wavenet_layer in enumerate(self.wavenet_layers):
+            x_list = [x]
+            # ST-Norm
+            if self.snorm:
+                x_list.append(self.snorm_layers[layer](x))
+            if self.tnorm:
+                x_list.append(self.tnorm_layers[layer](x))    
+            x = torch.cat(x_list, dim=1)
 
-        # linear layer for input transform
-        x = self.start_conv(x)
-        skip = 0
+            h_tcn, x = wavenet_layer(x)
+            x_skip = self.skip_convs[layer](h_tcn)  # (B, skip_dim, N, L')
+            x_skips.append(x_skip)
 
-        for gwnet in self.gwnet_layers:
-            x, skip = gwnet(x, skip)
-
-        x = F.relu(skip)
-        x = F.relu(self.end_conv_1(x))
-        x = self.end_conv_2(x)
-        output = torch.squeeze(x)
+        # Output layer
+        assert x_skip.shape[-1] == 1, "Temporal dimension must be equal to 1."
+        x = x_skip  # Last skip component
+        for x_skip in x_skips[:-1]:
+            x = x + x_skip[..., -1].unsqueeze(dim=-1)  # (B, skip_dim, N, 1)
+        output = self.output(x).squeeze(dim=-1)  # (B, Q, N)
 
         return output, None, None
 
-class _WaveNetLayer(nn.Module):
-    """
-    Graph Wavenet layer.
+    def _pad_seq_to_receptive(self, x: Tensor) -> Tensor:
+        """Pad sequence to the receptive field."""
+        in_len = x.shape[-1]
+        if in_len < self._receptive_field:
+            x = F.pad(x, (self._receptive_field - in_len, 0))
 
-    Parameters:
-        new_dilation: dilated_factor in current layer
-        kernel_size: size of kernel for convolution
-        hid_channels: hidden channels
-        n_series: number of nodes
-        tnorm_bool: whether to add temporal normalization
-        snorm_bool: whether to add spatial normalization
-    """
-    def __init__(
-        self,
-        new_dilation: int,
-        kernel_size: int,
-        hid_channels: int,
-        n_series: int,
-        tnorm_bool: bool,
-        snorm_bool: bool
-    ):
-        super(_WaveNetLayer, self).__init__()
-
-        self.tnorm_bool = tnorm_bool
-        self.snorm_bool = snorm_bool
-        num = int(tnorm_bool) + int(snorm_bool) + 1
-
-        # ST-Norm
-        if tnorm_bool:
-            self.tnorm = TNorm(n_series, hid_channels)
-        if snorm_bool:
-            self.snorm = SNorm(hid_channels)
-
-        # dilated convolutions
-        self.filter_convs = nn.Conv2d(
-            in_channels=num * hid_channels,
-            out_channels=hid_channels,
-            kernel_size=(1, kernel_size),
-            dilation=new_dilation)
-
-        self.gate_convs = nn.Conv2d(
-            in_channels=num * hid_channels,
-            out_channels=hid_channels,
-            kernel_size=(1, kernel_size), 
-            dilation=new_dilation)
-        
-        # 1x1 convolution for residual connection
-        self.residual_convs = nn.Conv2d(
-            in_channels=hid_channels,
-            out_channels=hid_channels,
-            kernel_size=(1, 1))
-
-        # 1x1 convolution for skip connection
-        self.skip_convs = nn.Conv2d(
-            in_channels=hid_channels,
-            out_channels=hid_channels,
-            kernel_size=(1, 1))
-    
-    def forward(
-        self,
-        x: Tensor,
-        skip: Tensor,
-    ) -> Tensor:
-        """
-        Forward pass.
-
-        Parameters:
-            x: node feature matrix
-            x_skip: node feature matrix for skip connection
-            supports: transition/adjacency matrices
-
-        Return:
-            x: output 
-            x_skip: output for skip connection
-
-        Shape:
-            x: (B, C, N, T)
-            x_skip: (B, C, N, T)
-        """
-        residual = x
-        x_list = []
-        x_list.append(x)
-        # ST-Norm
-        if self.tnorm_bool:
-            x_tnorm = self.tnorm(x)
-            x_list.append(x_tnorm)    
-        if self.snorm_bool:
-            x_snorm = self.snorm(x)
-            x_list.append(x_snorm)
-        
-        x = torch.cat(x_list, dim=1)
-        
-        # dilated convolution
-        filter = self.filter_convs(x)
-        filter = torch.tanh(filter)
-        gate = self.gate_convs(x)
-        gate = torch.sigmoid(gate)
-        x = filter * gate
-        # skip connection
-        s = self.skip_convs(x)
-        try:
-            skip = skip[:, :, :,  -s.size(3):]
-        except:
-            skip = 0
-        skip = s + skip
-
-        x = x + residual[:, :, :, -x.size(3):]
-
-        return x, skip
-
-class SNorm(nn.Module):
-    """
-    Spatial Normalization.
-
-    Parameters:
-        channels: input channels
-    """
-    def __init__(
-        self,
-        channels: int
-    ):
-        super(SNorm, self).__init__()
-
-        self.beta = nn.Parameter(torch.zeros(channels))
-        self.gamma = nn.Parameter(torch.ones(channels))
-
-    def forward(
-        self,
-        x: Tensor
-    ) -> Tensor:
-        x_norm = (x - x.mean(2, keepdims=True)) / (x.var(2, keepdims=True, unbiased=True) + 0.00001) ** 0.5
-        out = x_norm * self.gamma.view(1, -1, 1, 1) + self.beta.view(1, -1, 1, 1)
-
-        return out
-
-class TNorm(nn.Module):
-    """
-    Temporal Normalization.
-
-    Parameters:
-        n_series: number of nodes
-        channels: input channels
-        track_running_stats: whether to track running stats
-        momentum: momentum
-    """
-    def __init__(
-        self,
-        n_series: int,
-        channels: int,
-        track_running_stats:bool = True,
-        momentum:float = 0.1
-    ):
-        super(TNorm, self).__init__()
-
-        self.track_running_stats = track_running_stats
-        self.beta = nn.Parameter(torch.zeros(1, channels, n_series, 1))
-        self.gamma = nn.Parameter(torch.ones(1, channels, n_series, 1))
-        self.register_buffer('running_mean', torch.zeros(1, channels, n_series, 1))
-        self.register_buffer('running_var', torch.ones(1, channels, n_series, 1))
-        self.momentum = momentum
-
-    def forward(
-        self,
-        x: Tensor
-    ) -> Tensor:
-        if self.track_running_stats:
-            mean = x.mean((0, 3), keepdims=True)
-            var = x.var((0, 3), keepdims=True, unbiased=False)
-            if self.training:
-                n = x.shape[3] * x.shape[0]
-                with torch.no_grad():
-                    self.running_mean = self.momentum * mean + (1 - self.momentum) * self.running_mean
-                    self.running_var = self.momentum * var * n / (n - 1) + (1 - self.momentum) * self.running_var
-            else:
-                mean = self.running_mean
-                var = self.running_var
-        else:
-            mean = x.mean((3), keepdims=True)
-            var = x.var((3), keepdims=True, unbiased=True)
-        x_norm = (x - mean) / (var + 0.00001) ** 0.5
-        out = x_norm * self.gamma + self.beta
-
-        return out
+        return x

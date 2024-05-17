@@ -2,14 +2,15 @@
 model_params:
     # Spatial/Temporal pattern extractor
     st_params:
-        Kt: 3
-        Ks: 3
-        blocks: [[1], [64, 16, 64], [64, 16, 64], [128, 128], [12]]
+        st_h_dims: [[64, 16, 64], [64, 16, 64]]
+        kernel_size: 3
         n_series: 307
-        t_window: 12
-        act_func: 'glu'
-        graph_conv_type: 'cheb_graph_conv'
-        bias: True
+        cheb_k: 3
+        act: "glu"
         dropout: 0.5
+    in_dim: 1
+    in_len: 12
+    end_dim: 128
+    out_len: 12
 
 fit_params:

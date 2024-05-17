@@ -2,21 +2,21 @@
 model_params:
     # Spatial/Temporal pattern extractor
     st_params:
-        n_series: 883
-        t_window: 12
+        n_layers: 3
+        lin_h_dim: 24
+        ffl_h_dim: 256
+        n_heads: 4
+        node_emb_dim: 0
+        tid_emb_dim: 24
+        diw_emb_dim: 24
+        adp_emb_dim: 80
         n_tids: 288
-        num_layers: 3
-        input_dim: 3
-        output_dim: 1
-        input_embedding_dim: 24
-        tid_embedding_dim: 24
-        diw_embedding_dim: 24
-        spatial_embedding_dim: 0
-        adaptive_embedding_dim: 80
-        feed_forward_dim: 256
-        num_heads: 4
-        dropout: 0.1
         use_mixed_proj: True
+        dropout: 0.1
+    in_dim: 3
+    in_len: 12
+    out_dim: 1
     out_len: 12
+    n_series: 883
 
 fit_params:

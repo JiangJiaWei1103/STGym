@@ -39,7 +39,3 @@ dataset:
     horizon: 3
     n_tids: 24         # Number of time slots in one day
     multi_step: True
-    day_window: null
-    week_window: null
-    num_of_day: null
-    num_of_week: null

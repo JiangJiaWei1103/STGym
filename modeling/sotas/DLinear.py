@@ -12,59 +12,49 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
+from modeling.stgym.temporal_layers import SeriesDecompose
+
 class DLinear(nn.Module):
-    """
-    DLinear.
+    """DLinear framework.
 
     Parameters:
-        t_window: lookback time window
-        n_series: number of nodes
-        individual: whether to share linear layer for all nodes
+        in_len: input sequence length
         out_len: output sequence length
+        n_series: number of series
+        individual: whether to share linear layer for all nodes
     """
-    def __init__(
-        self,
-        st_params: Dict[str, Any],
-        out_len: int
-    ):
+    def __init__(self, in_len: int, out_len: int, st_params: Dict[str, Any]) -> None:
+        self.name = self.__class__.__name__
         super(DLinear, self).__init__()
 
         # Network parameters
         self.st_params = st_params
         self.out_len = out_len
-        # hyperparameters of Spatial/Temporal pattern extractor
-        self.t_window = self.st_params["t_window"]
+        # Spatio-temporal pattern extractor
         self.n_series = self.st_params["n_series"]
         self.individual = self.st_params["individual"]
         
-        
+        # Model blocks
         # Decompsition Kernel Size
         kernel_size = 25
-        self.decompsition = _Series_Decomp(kernel_size)
-
+        self.decompsition = SeriesDecompose(kernel_size)
         # Linear layer
         if self.individual:
-            self.Linear_Seasonal = nn.ModuleList()
-            self.Linear_Trend = nn.ModuleList()
+            self.linear_seasonal = nn.ModuleList()
+            self.linear_trend = nn.ModuleList()
             for _ in range(self.n_series):
-                self.Linear_Seasonal.append(nn.Linear(self.t_window, self.out_len))
-                self.Linear_Trend.append(nn.Linear(self.t_window, self.out_len))
+                self.linear_seasonal.append(nn.Linear(in_len, self.out_len))
+                self.linear_trend.append(nn.Linear(in_len, self.out_len))
         else:
-            self.Linear_Seasonal = nn.Linear(self.t_window, self.out_len)
-            self.Linear_Trend = nn.Linear(self.t_window, self.out_len)
+            self.linear_seasonal = nn.Linear(in_len, self.out_len)
+            self.linear_trend = nn.Linear(in_len, self.out_len)
 
 
-    def forward(
-        self,
-        x: Tensor,
-        As: Optional[List[Tensor]] = None,
-        **kwargs: Any,
-    ) -> Tuple[Tensor, None, None]:
-        """
-        Forward pass.
+    def forward(self, x: Tensor, As: Optional[List[Tensor]] = None, **kwargs: Any) -> Tuple[Tensor, None, None]:
+        """Forward pass.
 
         Parameters:
-            x: input features
+            x: input sequence
 
         Shape:
             x: (B, P, N, C)
@@ -75,79 +65,16 @@ class DLinear(nn.Module):
 
         # Linear layer
         if self.individual:
-            seasonal_output = torch.zeros(
-                [seasonal_init.size(0), seasonal_init.size(1), self.out_len],
-                dtype=seasonal_init.dtype
-            ).to(seasonal_init.device)
-
-            trend_output = torch.zeros(
-                [trend_init.size(0), trend_init.size(1), self.out_len],
-                dtype=trend_init.dtype
-            ).to(trend_init.device)
-
+            seasonal_output = torch.zeros([x.size(0), x.size(2), self.out_len], dtype=x.dtype).to(x.device)
+            trend_output = torch.zeros([x.size(0), x.size(2), self.out_len], dtype=x.dtype).to(x.device)
             for i in range(self.n_series):
-                seasonal_output[:, i, :] = self.Linear_Seasonal[i](seasonal_init[:, i, :])
-                trend_output[:, i, :] = self.Linear_Trend[i](trend_init[:, i, :])
+                seasonal_output[:, i, :] = self.linear_seasonal[i](seasonal_init[:, i, :])
+                trend_output[:, i, :] = self.linear_trend[i](trend_init[:, i, :])
         else:
-            seasonal_output = self.Linear_Seasonal(seasonal_init)
-            trend_output = self.Linear_Trend(trend_init)
+            seasonal_output = self.linear_seasonal(seasonal_init)
+            trend_output = self.linear_trend(trend_init)
 
         x = seasonal_output + trend_output  # (B, N, out_len)
+        output = x.permute(0,2,1)
 
-        return x.permute(0,2,1), None, None
-    
-class _Moving_Avg(nn.Module):
-    """
-    Moving average block to highlight the trend of time series.
-
-    Parameters:
-        kernel_size: window size of moving average
-        stride: stride of moving average
-    """
-    def __init__(
-        self,
-        kernel_size: int,
-        stride: int
-    ):
-        super(_Moving_Avg, self).__init__()
-
-        self.kernel_size = kernel_size
-        self.avg = nn.AvgPool1d(kernel_size=kernel_size, stride=stride, padding=0)
-
-    def forward(
-        self,
-        x: Tensor
-    ) -> Tensor:
-        
-        # padding on the both ends of time series
-        front = x[:, 0:1, :].repeat(1, (self.kernel_size - 1) // 2, 1)
-        end = x[:, -1:, :].repeat(1, (self.kernel_size - 1) // 2, 1)
-        x = torch.cat([front, x, end], dim=1)
-
-        x = self.avg(x.permute(0, 2, 1))
-        x = x.permute(0, 2, 1)
-
-        return x
-    
-class _Series_Decomp(nn.Module):
-    """
-    Series decomposition block.
-
-    Parameters:
-        kernel_size: window size of moving average
-    """
-    def __init__(
-        self,
-        kernel_size: int
-    ):
-        super(_Series_Decomp, self).__init__()
-        self.moving_avg = _Moving_Avg(kernel_size, stride=1)
-
-    def forward(
-        self,
-        x: int
-    ):
-        moving_mean = self.moving_avg(x)
-        res = x - moving_mean
-
-        return res, moving_mean
+        return output, None, None

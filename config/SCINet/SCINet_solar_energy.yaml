@@ -1,25 +1,22 @@
 # Configuration file for model architecture `SCINet`
 model_params:
-    net_params:
-        dataset_name: solar_energy
-        t_window: 160
-        n_series: 137
-        num_stacks: 2
-        num_levels: 4
-        num_decoder_layer: 1
-        output_len: 24
-        concat_len: 136
-        hid_size: 1
+    st_params:
+        n_stacks: 2
+        n_levels: 4
+        n_decoder_layer: 1
+        h_ratio: 1
         kernel_size: 5
         groups: 1
         dropout: 0.25
         INN: True
-        single_step_output_One: 0
-        positionalEcoding: False
-        RIN: False
+        positional_ecoding: False
+        dataset_name: solar_energy
     loss_params:
         single_step: 0
         lastWeight: 0.5
         criterion: smooth_l1_loss
+    in_len: 160
+    out_len: 3
+    n_series: 137
 
 fit_params:

@@ -14,206 +14,106 @@ from torch import Tensor
 
 from metadata import N_DAYS_IN_WEEK
 
+from modeling.stgym.common_layers import Linear2d, AuxInfoEmbeddings, MultiLayerPerceptron
+
 class STID(nn.Module):
-    """
-    STID.
+    """STID framework.
 
     Parameters:
-        st_params: hyperparameters of Spatial/Temporal pattern extractor
-        num_layer: number of mlp layers
-        n_series: number of nodes
-        t_window: lookback time window
-        input_dim: dimension of input feature
-        node_dim: dimension of spatial embeddings
-        embed_dim: output dimension of embedding layer
-        temp_dim_tid: dimension of temporal embeddings (time in day)
-        temp_dim_diw: dimension of temporal embeddings (day in week)
-        time_of_day_size: number of times in day
-        day_of_week_size: number of days in week
-        if_time_in_day: whether to add temporal embeddings (time in day)
-        if_day_in_week: whether to add temporal embeddings (day in week)
-        if_spatial: whether to add spatial embeddings
+        in_dim: input feature dimension
+        in_len: input sequence length
         out_len: output sequence length
+        n_series: number of series
+        n_layers: number of MLP layers
+        lin_h_dim: hidden dimension of input linear layer
+        node_emb_dim: dimension of static node embedding
+        tid_emb_dim: dimension of time in day embedding
+        diw_emb_dim: dimension of day in week embedding
+        n_tids: number of times in day
     """
-    def __init__(
-        self,
-        st_params: Dict[str, Any],
-        out_len: int,
-    ):
+    def __init__(self, in_dim: int, in_len: int, out_len: int, n_series: int, st_params: Dict[str, Any]) -> None:
+        self.name = self.__class__.__name__
         super(STID, self).__init__()
 
         # Network parameters
         self.st_params = st_params
-        self.out_len = out_len
-        
-        # hyperparameters of Spatial/Temporal pattern extractor
-        self.num_layer = self.st_params["num_layer"]
-        self.n_series = self.st_params["n_series"]
-        self.t_window = self.st_params["t_window"]
-        self.input_dim = self.st_params["input_dim"]
-        self.node_dim = self.st_params["node_dim"]
-        self.embed_dim = self.st_params["embed_dim"]   
-        self.temp_dim_tid = self.st_params["temp_dim_tid"]
-        self.temp_dim_diw = self.st_params["temp_dim_diw"]
-        self.time_of_day_size = self.st_params["time_of_day_size"]
-        self.day_of_week_size = self.st_params["day_of_week_size"]
-        self.if_time_in_day = self.st_params["if_time_in_day"]
-        self.if_day_in_week = self.st_params["if_day_in_week"]
-        self.if_spatial = self.st_params["if_spatial"]
+        # Spatio-temporal pattern extractor
+        self.n_layers = st_params["n_layers"]
+        lin_h_dim = st_params["lin_h_dim"]
+        self.node_emb_dim = st_params["node_emb_dim"]
+        self.tid_emb_dim = st_params["tid_emb_dim"]
+        self.diw_emb_dim = st_params["diw_emb_dim"]
+        self.n_tids = st_params["n_tids"]
+        self.in_dim = in_dim
 
-        # spatial embeddings
-        if self.if_spatial:
-            self.node_emb = nn.Parameter(
-                torch.empty(self.n_series, self.node_dim))
-            nn.init.xavier_uniform_(self.node_emb)
-
-        # temporal embeddings
-        if self.if_time_in_day:
-            self.time_in_day_emb = nn.Parameter(
-                torch.empty(self.time_of_day_size, self.temp_dim_tid))
-            nn.init.xavier_uniform_(self.time_in_day_emb)
-        if self.if_day_in_week:
-            self.day_in_week_emb = nn.Parameter(
-                torch.empty(self.day_of_week_size, self.temp_dim_diw))
-            nn.init.xavier_uniform_(self.day_in_week_emb)
-
-        # embedding layer
-        self.time_series_emb_layer = nn.Conv2d(
-            in_channels=self.input_dim * self.t_window, 
-            out_channels=self.embed_dim,
-            kernel_size=(1, 1),
-            bias=True)
-
-        # encoding
-        self.hidden_dim = self.embed_dim + self.node_dim * \
-            int(self.if_spatial) + self.temp_dim_tid * int(self.if_time_in_day) + \
-            self.temp_dim_diw * int(self.if_day_in_week)
+        # Model blocks
+        # Input linear layer
+        self.in_lin = Linear2d(in_dim * in_len, lin_h_dim)
+        # Auxiliary information embeddings
+        self.aux_info_emb = AuxInfoEmbeddings(
+            n_tids=self.n_tids,
+            n_series=n_series,
+            node_emb_dim=self.node_emb_dim,
+            tid_emb_dim=self.tid_emb_dim,
+            diw_emb_dim=self.diw_emb_dim
+        )
+        # Encoder
+        h_dim = lin_h_dim + self.node_emb_dim + self.tid_emb_dim + self.diw_emb_dim
         self.encoder = nn.Sequential(
-            *[_MultiLayerPerceptron(self.hidden_dim, self.hidden_dim) for _ in range(self.num_layer)])
+            *[
+                MultiLayerPerceptron(
+                    in_dims=[h_dim, h_dim],
+                    h_dims=[h_dim, h_dim],
+                    acts=["relu", None],
+                    dropouts=[0.15, None],
+                    bns=[False, False],
+                    residual=True
+                ) for _ in range(self.n_layers)
+            ]
+        )
+        # Output layer
+        self.output = Linear2d(in_features=h_dim, out_features=out_len)
 
-        # regression
-        self.regression_layer = nn.Conv2d(
-            in_channels=self.hidden_dim,
-            out_channels=self.out_len,
-            kernel_size=(1, 1),
-            bias=True)
-
-    def forward(
-        self,
-        x: Tensor,
-        As: Optional[List[Tensor]] = None,
-        **kwargs: Any,
-    ) -> Tuple[Tensor, None, None]:
-        """
-        Forward pass.
+    def forward(self, x: Tensor, As: Optional[List[Tensor]] = None, **kwargs: Any) -> Tuple[Tensor, None, None]:
+        """Forward pass.
 
         Parameters:
-            x: input features
+            x: input sequence
+
+        Return:
+            output: prediction
 
         Shape:
-            input: (B, P, N, C)
-            prediction: (B, out_len, N)
-
-        Returns:
-            prediction: prediction
+            x: (B, P, N, C)
+            output: (B, Q, N)
         """
-        # prepare data
-        input_data = x[..., range(self.input_dim)]
-
-        if self.if_time_in_day:
-            tid_data = x[..., 1]
-            # the time_of_day feature is normalized to [0, 1]. 
-            # We multiply it by 288 to get the index.
-            time_in_day_emb = self.time_in_day_emb[
-                (tid_data[:, -1, :] * self.time_of_day_size).type(torch.LongTensor)]
-        else:
-            time_in_day_emb = None
-        if self.if_day_in_week:
-            diw_data = x[..., 2]
-            day_in_week_emb = self.day_in_week_emb[
-                (diw_data[:, -1, :] * N_DAYS_IN_WEEK).type(torch.LongTensor)]
-        else:
-            day_in_week_emb = None
-
-        # time series embedding
-        batch_size, _, n_series, _ = input_data.shape
-        input_data = input_data.transpose(1, 2).contiguous()
-        input_data = input_data.view(
-            batch_size, n_series, -1).transpose(1, 2).unsqueeze(-1)
-        time_series_emb = self.time_series_emb_layer(input_data)
-
-        # spatial embeddings
-        node_emb = []
-        if self.if_spatial:
-            node_emb.append(self.node_emb.unsqueeze(0).expand(
-                batch_size, -1, -1).transpose(1, 2).unsqueeze(-1))  # (B, D, N, 1)
-        # temporal embeddings
-        tem_emb = []
-        if time_in_day_emb is not None:
-            tem_emb.append(time_in_day_emb.transpose(1, 2).unsqueeze(-1))   # (B, D, N, 1)
-        if day_in_week_emb is not None:
-            tem_emb.append(day_in_week_emb.transpose(1, 2).unsqueeze(-1))   # (B, D, N, 1)
-
-        # concate all embeddings along channel
-        hidden = torch.cat([time_series_emb] + node_emb + tem_emb, dim=1)
-
-        # encoding
-        hidden = self.encoder(hidden)   # (B, D, N, 1)
-
-        # regression
-        prediction = self.regression_layer(hidden)  # (B, out_len, N, 1)
-        prediction = torch.squeeze(prediction)
-
-        return prediction, None, None
-
-class _MultiLayerPerceptron(nn.Module):
-    """
-    Multi-Layer Perceptron with residual links.
-
-    Parameters:
-        input_dim: input channel
-        hidden_dim: hidden channel
-    """
-    def __init__(
-        self, 
-        input_dim: int, 
-        hidden_dim: int
-    ):
-        super(_MultiLayerPerceptron, self).__init__()
-
-        self.fc1 = nn.Conv2d(
-            in_channels=input_dim,
-            out_channels=hidden_dim,
-            kernel_size=(1, 1), 
-            bias=True)
-        self.fc2 = nn.Conv2d(
-            in_channels=hidden_dim,
-            out_channels=hidden_dim,
-            kernel_size=(1, 1),
-            bias=True)
+        if self.tid_emb_dim > 0:
+            tid = (x[:, -1, :, 1] * self.n_tids).int()
+        if self.diw_emb_dim > 0:
+            diw = (x[:, -1, :, 2] * N_DAYS_IN_WEEK).int()
+        x = x[..., range(self.in_dim)]
         
-        self.act = nn.ReLU()
-        self.drop = nn.Dropout(p=0.15)
+        # Input linear layer
+        batch_size, _, n_series, _ = x.shape
+        x = x.transpose(1, 2).contiguous()
+        x = x.view(batch_size, n_series, -1).transpose(1, 2).unsqueeze(-1)
+        h = self.in_lin(x)
 
-    def forward(
-        self,
-        input: Tensor
-    ) -> Tensor:
-        """
-        Forward pass.
+        # Auxiliary information embeddings
+        embs = []
+        x_node, _, x_tid, x_diw, _ = self.aux_info_emb(tid=tid, diw=diw)
+        if self.node_emb_dim > 0:
+            embs.append(x_node.unsqueeze(0).expand(batch_size, -1, -1).transpose(1, 2).unsqueeze(-1))
+        if self.tid_emb_dim > 0:
+            embs.append(x_tid.transpose(1, 2).unsqueeze(-1))
+        if self.diw_emb_dim > 0:
+            embs.append(x_diw.transpose(1, 2).unsqueeze(-1))
+        h = torch.cat([h] + embs, dim=1)    # concate all embeddings along channel
 
-        Parameters:
-            input: input data
-            
-        Shape:
-            input: (B, C, N, 1)
-            hidden: (B, C', N, 1)
+        # Encoder
+        h = self.encoder(h)   # (B, D, N, 1)
 
-        Returns:
-            hidden: latent representation
-        """
+        # Output layer
+        output = self.output(h).squeeze(-1)  # (B, Q, N)
 
-        hidden = self.fc2(self.drop(self.act(self.fc1(input))))
-        hidden = hidden + input
-
-        return hidden
+        return output, None, None

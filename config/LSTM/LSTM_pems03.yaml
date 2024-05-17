@@ -1,0 +1,13 @@
+# Configuration file for model architecture `LSTM`
+model_params:
+    # Spatial/Temporal Convolution Module
+    st_params:
+        n_layers: 1
+        lin_h_dim: 64
+        rnn_h_dim: 64
+        rnn_dropout: 0
+        end_dim: 512
+    in_dim: 2
+    out_len: 12
+
+fit_params:

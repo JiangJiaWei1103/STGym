@@ -41,7 +41,6 @@ class HARDPurG(nn.Module):
         st_params: Dict[str, Any],
         skip_out_dim: int,
         out_dim: int,
-        priori_gs: Optional[List[Tensor]] = None,
     ):
         self.name = self.__class__.__name__
         super(HARDPurG, self).__init__()
@@ -133,6 +132,7 @@ class HARDPurG(nn.Module):
     def forward(
         self,
         x: Tensor,
+        As: Optional[List[Tensor]] = None,
         tid: Optional[Tensor] = None,
         diw: Optional[Tensor] = None,
         **kwargs: Any,

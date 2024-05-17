@@ -63,10 +63,10 @@ solver:
 
     # ==Learning rate scheduler==
     lr_skd:
-        name: null
-        milestones: null
+        name: multistep
+        milestones: [10, 20, 30]
         # Multiplicative factor of learning rate decay
-        gamma: null
+        gamma: 0.3
 
         T_max: null
         eta_min: null

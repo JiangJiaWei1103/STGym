@@ -36,10 +36,6 @@ cv:
 # ==Dataset==
 dataset:
     t_window: 168
-    horizon: 24
+    horizon: 3
     n_tids: 1         # Number of time slots in one day
     multi_step: True
-    day_window: null
-    week_window: null
-    num_of_day: null
-    num_of_week: null

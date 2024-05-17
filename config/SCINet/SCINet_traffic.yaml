@@ -1,0 +1,22 @@
+# Configuration file for model architecture `SCINet`
+model_params:
+    st_params:
+        n_stacks: 2
+        n_levels: 3
+        n_decoder_layer: 1
+        h_ratio: 1
+        kernel_size: 5
+        groups: 1
+        dropout: 0.5
+        INN: True
+        positional_ecoding: False
+        dataset_name: traffic
+    loss_params:
+        single_step: 1
+        lastWeight: 1
+        criterion: smooth_l1_loss
+    in_len: 168
+    out_len: 3
+    n_series: 862
+
+fit_params:
