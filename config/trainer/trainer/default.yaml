@@ -1,0 +1,49 @@
+# trainer/default
+# * [ ] Instantiation of trainers.
+
+# https://github.com/facebookresearch/hydra/issues/2263
+# _target_: trainer.trainer.MainTrainer
+# _recursive_: False
+
+# == Default List ==
+defaults:
+    - optimizer: adam
+    - lr_skd: cos
+
+# == Core ==
+device: "mps:0"
+epochs: 1
+grad_accum_steps: 1
+batch_scheduler: True
+use_amp: False
+# Loss criterion
+loss_fn:
+    _target_: torch.nn.L1Loss
+# Dataloader
+dataloader:
+    batch_size: 64
+    shuffle: True
+    num_workers: 0
+    pin_memory: False
+    drop_last: False
+# Evaluator
+evaluator:
+    eval_metrics:
+        - mae
+        - rmse
+
+# == Callbacks ==
+# Early stopping
+es:
+    patience: 0
+    mode: null
+# Model checkpoint
+model_ckpt:
+    ckpt_metric: null
+    ckpt_mode: min
+    best_ckpt_mid: last
+
+# == Debug ==
+# If True, `_train_stop` stops after one batch, which is useful for
+# overfit one batch.
+one_batch_only: False

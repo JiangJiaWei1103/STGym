@@ -1,0 +1,14 @@
+# paths/default
+
+# == Projet Root ==
+ROOT_DIR: ${hydra:runtime.cwd}
+
+# == Data ==
+RAW_DATA_PATH: ${paths.ROOT_DIR}/data/raw/
+PROC_DATA_PATH: ${paths.ROOT_DIR}/data/processed/
+
+# == Config ==
+CONFIG_PATH: ${paths.ROOT_DIR}/config/
+
+# == Output ==
+DUMP_PATH: ${paths.ROOT_DIR}/output/

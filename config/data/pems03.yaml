@@ -1,0 +1,32 @@
+# data/pems03
+
+# ==Data Processing==
+dp:
+    data_path: ${paths.RAW_DATA_PATH}/pems03/pems03.txt
+    # Holdout test ratio
+    holdout_ratio: 0.2
+    # Time stamp encoder
+    time_enc:
+        add_tid: True
+        add_diw: True
+        n_tids: 288
+        max_norm: False
+    # Scaling
+    scaling: minmax 
+    # Priori graph structure
+    priori_gs:
+        type: null
+        k: null
+
+# == CV Scheme ==
+cv:
+    _target_: cv.ts.TSSplit
+    train_ratio: 0.75
+    val_ratio: 0.25
+
+# == Dataset (PyTorch) ==
+dataset:
+    _target_: data.dataset.TrafficDataset
+    _partial_: True 
+    t_window: 12
+    horizon: 12
