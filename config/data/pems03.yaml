@@ -2,7 +2,7 @@
 
 # ==Data Processing==
 dp:
-    data_path: ${paths.RAW_DATA_PATH}/pems03/pems03.txt
+    data_path: ${paths.RAW_DATA_PATH}/pems03/pems03.npz
     # Holdout test ratio
     holdout_ratio: 0.2
     # Time stamp encoder

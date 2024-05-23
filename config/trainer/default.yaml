@@ -8,7 +8,7 @@
 # == Default List ==
 defaults:
     - optimizer: adam
-    - lr_skd: cos
+    - lr_skd: cos 
 
 # == Core ==
 device: "mps:0"
@@ -18,7 +18,15 @@ batch_scheduler: True
 use_amp: False
 # Loss criterion
 loss_fn:
-    _target_: torch.nn.L1Loss
+    _target_: criterion.custom.MaskedLoss
+    name: l1
+    # ===
+    # Refactor custom ops
+    # rescale: True
+    # cl:
+    #     lv_up_period: 2500
+    #     task_lv_max: 12
+    # ===
 # Dataloader
 dataloader:
     batch_size: 64
@@ -28,9 +36,15 @@ dataloader:
     drop_last: False
 # Evaluator
 evaluator:
-    eval_metrics:
-        - mae
-        - rmse
+    _target_: evaluating.evaluator.Evaluator
+    metric_names:
+        - mmae
+        - mrmse
+        - mmape
+    horiz_cuts:
+        - 3
+        - 6
+        - 12
 
 # == Callbacks ==
 # Early stopping
