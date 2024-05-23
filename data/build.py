@@ -4,58 +4,40 @@ Author: JiaWei Jiang
 
 This file contains the basic logic of building dataloaders for training
 and evaluation processes.
-"""
-from typing import Any, Optional, Tuple, Type, Union
 
-import pandas as pd
+* [ ] Modify dataloader building logic (maybe one at a time).
+"""
+from typing import Any
+
+import numpy as np
+from hydra.utils import instantiate
+from omegaconf.dictconfig import DictConfig
 from torch.utils.data import DataLoader
 
-from metadata import MTSFBerks, TrafBerks
 
-from .dataset import BenchmarkDataset, TrafficDataset
+def build_dataloader(data: np.ndarray, data_split: str, dataset_cfg: DictConfig, **dataloader_cfg: Any) -> DataLoader:
+    """Build and return dataloader.
 
+    Args:
+        data: Data to be fed into torch Dataset.
+        data_split: The data split.
+        dataset_cfg: The hyperparameters of dataset.
+        dataloader_cfg: The hyperparameters of dataloader.
 
-def build_dataloaders(
-    df_tr: pd.DataFrame, df_val: pd.DataFrame, batch_size: int, shuffle: bool, num_workers: int, **dataset_cfg: Any
-) -> Tuple[DataLoader, Optional[DataLoader]]:
-    """Create and return train and validation data loaders.
-
-    Parameters:
-        df_tr: training data
-        df_val: validation data
-        batch_size: number of samples per batch
-        shuffle: whether to shuffle samples every epoch
-        num_workers: number of subprocesses used to load data
-        dataset_cfg: hyperparameters of customized dataset
-
-    Return:
-        train_loader: training data loader
-        val_loader: validation data loader
+    Returns:
+        A dataloader of the given data split.
     """
-    dataset: Union[Type[BenchmarkDataset], Type[TrafficDataset]] = None
-    if dataset_cfg["name"] in MTSFBerks:
-        dataset = BenchmarkDataset
-        collate_fn = None
-    elif dataset_cfg["name"] in TrafBerks:
-        dataset = TrafficDataset
-        collate_fn = None
-
-    train_loader = DataLoader(
-        dataset(df_tr, **dataset_cfg),
-        batch_size=batch_size,
+    dataset = instantiate(dataset_cfg)
+    collate = None
+    shuffle = dataloader_cfg["shuffle"] if data_split == "train" else False
+    dataloader = DataLoader(
+        dataset(data),
+        batch_size=dataloader_cfg["batch_size"],
         shuffle=shuffle,
-        num_workers=num_workers,
-        collate_fn=collate_fn,
+        num_workers=dataloader_cfg["num_workers"],
+        collate_fn=collate,
+        pin_memory=dataloader_cfg["pin_memory"],
+        drop_last=dataloader_cfg["drop_last"],
     )
-    if df_val is not None:
-        val_loader = DataLoader(
-            dataset(df_val, **dataset_cfg),
-            batch_size=256,  # 1024 for solar
-            shuffle=False,  # Hard-coded
-            num_workers=num_workers,
-            collate_fn=collate_fn,
-        )
 
-        return train_loader, val_loader
-    else:
-        return train_loader, None
+    return dataloader

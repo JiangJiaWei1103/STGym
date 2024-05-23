@@ -26,7 +26,7 @@ class MaxScaler(object):
     independently from each feature if `local=True`. Or, `x_m` will be
     the maximum across all the features (e.g., time series, nodes).
 
-    Parameters:
+    Args:
         local: whether maximum value is extracted within each series
             (i.e., nodes) or across all series (globally, see TPA-LSTM)
 
@@ -41,11 +41,11 @@ class MaxScaler(object):
     def fit(self, X: Union[pd.DataFrame, np.ndarray]) -> MaxScaler:
         """Compute the maximums to be used for later scaling.
 
-        Parameters:
+        Args:
             X: data used to calculate maximum for later scaling, with
                 shape (n_samples, n_features)
 
-        Return:
+        Returns:
             self: fitted scaler
         """
         n_features = X.shape[1]
@@ -59,10 +59,10 @@ class MaxScaler(object):
     def transform(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
         """Perform scaling by dividing values by maximum.
 
-        Parameters:
+        Args:
             X: data to scale, with shape (n_samples, n_features)
 
-        Return:
+        Returns:
             X_tr: transformed (scaled) array, with shape as input
         """
         if isinstance(X, pd.DataFrame):
@@ -85,11 +85,11 @@ class MaxScaler(object):
         It's commonly used when users want to get the prediction and
         groundtruths at the original scale.
 
-        Parameters:
+        Args:
             X: input data to be inversely transformed, with shape
                 (n_sampels, n_features)
 
-        Return:
+        Returns:
             Xt: inversely transformed data, with shape as input
         """
         if isinstance(X, Tensor):
@@ -128,12 +128,12 @@ class StandardScaler(object):
     def fit(self, X: Union[pd.DataFrame, np.ndarray]) -> StandardScaler:
         """Compute the mean and std to be used for later scaling.
 
-        Parameters:
+        Args:
             X: ndarray or pd.DataFrame, data used to calculate mean and
                 standard deviation for later scaling, with shape
                 (n_samples, n_features)
 
-        Return:
+        Returns:
             self: fitted scaler
         """
         self.mean_ = np.mean(X)
@@ -144,10 +144,10 @@ class StandardScaler(object):
     def transform(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
         """Perform standardization by centering and scaling.
 
-        Parameters:
+        Args:
             X: data to scale, with shape (n_samples, n_features)
 
-        Return:
+        Returns:
             X_tr: transformed (scaled) array, with shape as input
         """
         if isinstance(X, pd.DataFrame):
@@ -170,11 +170,11 @@ class StandardScaler(object):
         It's commonly used when users want to get the prediction and
         groundtruths at the original scale.
 
-        Parameters:
+        Args:
             X: input data to be inversely transformed, with shape
                 (n_samples, n_features)
 
-        Return:
+        Returns:
             Xt: inversely transformed data, with shape as input
         """
         Xt = X * self.std_ + self.mean_
@@ -203,10 +203,10 @@ class MinMaxScaler(object):
     def fit(self, X: Union[pd.DataFrame, np.ndarray]) -> MinMaxScaler:
         """Compute the min and max to be used for later scaling.
 
-        Parameters:
+        Args:
             X: data used to calculate min and max for later scaling
 
-        Return:
+        Returns:
             self: fitted scaler
         """
         self.min_ = np.min(X)
@@ -219,10 +219,10 @@ class MinMaxScaler(object):
     def transform(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
         """Perform normalization by scaling to range [-1, 1].
 
-        Parameters:
+        Args:
             X: data to scale, with shape (n_samples, n_features)
 
-        Return:
+        Returns:
             X_tr: transformed (scaled) array, with shape as input
         """
         if isinstance(X, pd.DataFrame):
@@ -245,11 +245,11 @@ class MinMaxScaler(object):
         It's commonly used when users want to get the prediction and
         groundtruths at the original scale.
 
-        Parameters:
+        Args:
             X: input data to be inversely transformed, with shape
                 (n_samples, n_features)
 
-        Return:
+        Returns:
             Xt: inversely transformed data, with shape as input
         """
         Xt = (X + 1) / 2 * self.range_ + self.min_

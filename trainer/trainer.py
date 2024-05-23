@@ -2,7 +2,7 @@
 Custom trainer definitions for different training processes.
 Author: JiaWei Jiang
 
-This file contains diversified trainers, whose training logics are
+Definitions of diversified trainers, whose core training logics are
 inherited from `BaseTrainer`.
 
 * [ ] Pack input data in Dict.
@@ -10,7 +10,8 @@ inherited from `BaseTrainer`.
 """
 import gc
 from logging import Logger
-from typing import Any, Dict, Optional, Tuple, Union
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -35,7 +36,7 @@ class MainTrainer(BaseTrainer):
     processes (e.g., model input, advanced data processing, graph node
     sampling, customized multitask criterion definition).
 
-    Parameters:
+    Args:
         logger: message logger
         proc_cfg: hyperparameters for training and evaluation processes
         model: model instance
@@ -60,9 +61,11 @@ class MainTrainer(BaseTrainer):
         lr_skd: Union[_LRScheduler, lr_scheduler.ReduceLROnPlateau],
         es: EarlyStopping,
         evaluator: Evaluator,
-        scaler: Union[MaxScaler, StandardScaler],
+        ckpt_path: Union[Path, str],
         train_loader: DataLoader,
         eval_loader: Optional[DataLoader] = None,
+        priori_gs: Optional[List[Tensor]] = None,
+        scaler: Optional[Union[MaxScaler, StandardScaler]] = None,
         use_wandb: bool = True,
     ):
         super(MainTrainer, self).__init__(
@@ -72,25 +75,29 @@ class MainTrainer(BaseTrainer):
             loss_fn,
             optimizer,
             lr_skd,
+            ckpt_path,
             es,
             evaluator,
             use_wandb,
         )
         self.train_loader = train_loader
         self.eval_loader = eval_loader if eval_loader else train_loader
+        self.priori_gs = None if priori_gs is None else [A.to(self.device) for A in priori_gs]
         self.scaler = scaler
-        self.rescale = proc_cfg["loss_fn"]["rescale"]
+        # self.rescale = proc_cfg["loss_fn"]["rescale"]
+        self.rescale = True
 
         # Curriculum learning
-        if self.proc_cfg["loss_fn"]["cl"] is not None:
-            self._cl = CLTracker(**self.proc_cfg["loss_fn"]["cl"])
-        else:
-            self._cl = None
+        # if self.proc_cfg["loss_fn"]["cl"] is not None:
+        #     self._cl = CLTracker(**self.proc_cfg["loss_fn"]["cl"])
+        # else:
+        #     self._cl = None
+        self._cl = None
 
     def _train_epoch(self) -> float:
         """Run training process for one epoch.
 
-        Return:
+        Returns:
             train_loss_avg: average training loss over batches
         """
         train_loss_total = 0
@@ -103,18 +110,9 @@ class MainTrainer(BaseTrainer):
             # Retrieve batched raw data
             x = batch_data["X"].to(self.device)
             y = batch_data["y"].to(self.device)
-            tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
-            diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
             # Forward pass and derive loss
-            output, *_ = self.model(
-                x,
-                tid=tid,
-                diw=diw,
-                ycl=y,
-                batches_seen=self._iter,
-                task_level=None if self._cl is None else self._cl.get_task_lv(),
-            )
+            output, *_ = self.model(x, self.priori_gs, ycl=y, iteration=self._iter)
 
             # Inverse transform to the original scale
             if self.rescale:
@@ -122,6 +120,8 @@ class MainTrainer(BaseTrainer):
                 y = self.scaler.inverse_transform(y)
 
             # Derive loss
+            if y.dim() == 4:
+                y = y[..., 0]
             if self._cl is not None:
                 task_lv = self._cl.get_task_lv()
                 loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
@@ -137,6 +137,9 @@ class MainTrainer(BaseTrainer):
             self._iter += 1
             train_loss_total += loss.item()
 
+            if self.step_per_batch:
+                self.lr_skd.step()
+
             # Free mem.
             del x, y, output
             _ = gc.collect()
@@ -151,16 +154,14 @@ class MainTrainer(BaseTrainer):
         self,
         return_output: bool = False,
         datatype: str = "val",
-        test: bool = False,
     ) -> Tuple[float, Dict[str, float], Optional[Tensor]]:
         """Run evaluation process for one epoch.
 
-        Parameters:
+        Args:
             return_output: whether to return inference result of model
             datatype: type of the dataset to evaluate
-            test: always ignored, exists for compatibility
 
-        Return:
+        Returns:
             eval_loss_avg: average evaluation loss over batches
             eval_result: evaluation performance report
             y_pred: inference result
@@ -175,13 +176,13 @@ class MainTrainer(BaseTrainer):
             # Retrieve batched raw data
             x = batch_data["X"].to(self.device)
             y = batch_data["y"].to(self.device)
-            tid = None if "tid" not in batch_data else batch_data["tid"].to(self.device)
-            diw = None if "diw" not in batch_data else batch_data["diw"].to(self.device)
 
             # Forward pass
-            output, *_ = self.model(x, tid=tid, diw=diw)
+            output, *_ = self.model(x, self.priori_gs)
 
             # Derive loss
+            if y.dim() == 4:
+                y = y[..., 0]
             if self.rescale:
                 loss = self.loss_fn(
                     self.scaler.inverse_transform(output),
@@ -218,7 +219,7 @@ class MainTrainer(BaseTrainer):
 class CLTracker(object):
     """Tracker for curriculum learning.
 
-    Parameters:
+    Args:
         lv_up_period: task levels up every `lv_up_period` iterations if
             the current task level is lower than `task_lv_max`
         task_lv_max: hardest task level
@@ -232,13 +233,13 @@ class CLTracker(object):
         self._task_lv = 1
 
     def get_iter(self) -> int:
-        """Return the current iteration."""
+        """Returns the current iteration."""
         return self._iter
 
     def get_task_lv(self) -> int:
-        """Return the current task level.
+        """Returns the current task level.
 
-        Return:
+        Returns:
             self._task_lv: current task level
         """
         return self._task_lv

@@ -1,9 +1,6 @@
 """
-Custom loss criterion definitions.
+Custom loss criterions.
 Author: JiaWei Jiang
-
-If users want to use customized loss criterion, the corresponding class
-should be defined in this file.
 """
 import numpy as np
 import torch
@@ -14,13 +11,13 @@ from torch.nn.modules.loss import _Loss
 class MaskedLoss(_Loss):
     """Base loss criterion with masking mechanism.
 
-    Parameters:
-        name: name of the base loss criterion
-        masked_val: value to mask when deriving loss
+    Args:
+        name: Name of the base loss criterion.
+        masked_val: Value to mask when deriving loss.
     """
 
-    def __init__(self, name: str = "l1", masked_val: float = 0.0):
-        super(MaskedLoss, self).__init__()
+    def __init__(self, name: str = "l1", masked_val: float = 0.0) -> None:
+        super().__init__()
 
         self.name = name
         self.masked_val = masked_val
