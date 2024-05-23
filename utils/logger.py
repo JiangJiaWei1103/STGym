@@ -10,7 +10,7 @@ from typing import Optional
 class Logger:
     """Customized logger.
 
-    Parameters:
+    Args:
         logging_level: lowest-severity log message the logger handles
         logging_file: file stream for logging
             *Note: If `logging_file` isn't specified, message is only
@@ -30,7 +30,7 @@ class Logger:
         self._build_logger()
 
     def get_logger(self) -> logging.Logger:
-        """Return customized logger."""
+        """Returns customized logger."""
         return self._logger
 
     def _build_logger(self) -> None:
@@ -40,9 +40,9 @@ class Logger:
         self._add_handler()
 
     def _get_level(self) -> int:
-        """Return lowest severity of the events the logger handles.
+        """Returns lowest severity of the events the logger handles.
 
-        Return:
+        Returns:
             level: severity of the events
         """
         level = 0

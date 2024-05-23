@@ -1,0 +1,4 @@
+# trainer/lr_skd/cos
+_target_: torch.optim.lr_scheduler.CosineAnnealingLR
+_partial_: True
+eta_min: 0

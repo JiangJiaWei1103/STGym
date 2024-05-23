@@ -1,0 +1,23 @@
+# Main configuration
+
+# == Default List ==
+defaults:
+    - paths: default
+    - data: pems03 
+    - model: HARDPurG 
+    - trainer: default
+    - hydra: default
+
+# == Common ==
+# Project name
+project_name: Demo
+# Experiment identifier
+exp_id: null
+# Number of random seeds for running experiments with the same setup
+n_seeds: 2
+# Random seed, currently picked automatically
+seed: null
+# If True, use wandb to track training and evaluation processes
+use_wandb: False
+# If True, the experiment stops after one fold of CV is done
+one_fold_only: True

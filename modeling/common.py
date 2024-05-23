@@ -24,10 +24,10 @@ class Swish(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """Forward passing.
 
-        Parameters:
+        Args:
             x: input variables
 
-        Return:
+        Returns:
             x: non-linearly transformed variables
         """
         x = x * torch.sigmoid(x)
@@ -45,10 +45,10 @@ class Mish(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """Forward passing.
 
-        Parameters:
+        Args:
             x: input variables
 
-        Return:
+        Returns:
             x: non-linearly transformed variables
         """
         x = x * F.tanh(F.softplus(x))
@@ -59,7 +59,7 @@ class Mish(nn.Module):
 class GLU(nn.Module):
     """Gated linear unit.
 
-    Parameters:
+    Args:
         in_dim: input feature dimension
         h_dim: hidden dimension of linear layer
         dropout: dropout ratio
@@ -109,7 +109,7 @@ class SwapNoiseAdder(nn.Module):
 
     [ ] Swap based on some prior knowledge (e.g., node distance)
 
-    Parameters:
+    Args:
         doping_ratio: ratio of features to dope
         doping_scale: range to swap feature values, either global or
             in-batch
@@ -159,7 +159,7 @@ class MixProp(nn.Module):
 
     The implementation follows the MTGNN official release.
 
-    Parameters:
+    Args:
         c_in: input channel number
         c_out: output channel number
         gcn_depth: depth of graph convolution
@@ -203,12 +203,12 @@ class MixProp(nn.Module):
     def forward(self, x: Tensor, A: Tensor, hs: Optional[List[Tensor]] = None) -> Tuple[Tensor, None]:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: node features
             A: adjacency matrix
             hs: always ignored
 
-        Return:
+        Returns:
             h: final node embedding
 
         Shape:
@@ -242,7 +242,7 @@ class MixProp(nn.Module):
 class HopAwareRecGConv(nn.Module):
     """Hop-aware rectified graph convolution module.
 
-    Parameters:
+    Args:
         c_in: input channel number
         c_out: output channel number
         gcn_depth: depth of graph convolution
@@ -296,13 +296,13 @@ class HopAwareRecGConv(nn.Module):
     def forward(self, x: Tensor, A: Tensor, hs: Optional[List[Tensor]] = None) -> Tuple[Tensor, List[Tensor]]:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: node features
             A: adjacency matrix
             hs: hop-aware intermediate node embedding over A from layer
                 (l-1)
 
-        Return:
+        Returns:
             h: final node embedding
             h_latent: hop-aware intermediate node embedding over A for
                 the next `_HARDPurGLayer`
