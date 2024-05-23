@@ -20,7 +20,7 @@ from torch.nn import Module
 class ModelCheckpoint(object):
     """Model checkpooint.
 
-    Parameters:
+    Args:
         ckpt_path: path to save model checkpoint
         ckpt_metric: quantity to monitor during training process
         ckpt_mode: determine the direction of metric improvement
@@ -46,7 +46,7 @@ class ModelCheckpoint(object):
     ) -> None:
         """Update checkpoint status for the current epoch.
 
-        Parameters:
+        Args:
             epoch: current epoch
             model: current model instance
             val_loss: validation loss
@@ -70,11 +70,11 @@ class ModelCheckpoint(object):
     def save_ckpt(self, model: Module, mid: Optional[str] = None) -> None:
         """Save the checkpoint.
 
-        Parameters:
+        Args:
             model: current model instance
             mid: model identifer
 
-        Return:
+        Returns:
             None
         """
         self._save_ckpt(model, mid)
@@ -82,12 +82,12 @@ class ModelCheckpoint(object):
     def load_best_ckpt(self, model: Module, device: torch.device) -> Module:
         """Load and return the best model checkpoint for final evaluation.
 
-        Parameters:
+        Args:
             model: current model instance
                 *Note: Model weights are overrided by the best checkpoint
             device: device of the model instance
 
-        Return:
+        Returns:
             best_model: best model checkpoint
         """
         model = self._load_ckpt(model, device, self.best_ckpt_mid)
@@ -97,11 +97,11 @@ class ModelCheckpoint(object):
     def _save_ckpt(self, model: Module, mid: Optional[str] = None) -> None:
         """Save the model checkpoint.
 
-        Parameters:
+        Args:
             model: current model instance
             mid: model identifer
 
-        Return:
+        Returns:
             None
         """
         model_file = "model.pth" if mid is None else f"model-{mid}.pth"
@@ -110,13 +110,13 @@ class ModelCheckpoint(object):
     def _load_ckpt(self, model: Module, device: torch.device, mid: str = "last") -> Module:
         """Load the model checkpoint.
 
-        Parameters:
+        Args:
             model: current model instance
                 *Note: Model weights are overrided by the best checkpoint
             device: device of the model instance
             mid: model identifier
 
-        Return:
+        Returns:
             model: model instance with the loaded weights
         """
         model_file = f"model-{mid}.pth"

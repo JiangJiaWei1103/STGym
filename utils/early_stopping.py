@@ -16,7 +16,7 @@ class EarlyStopping(object):
     *Note: Applying ES might have a risk of overfitting on validation
     set.
 
-    Parameters:
+    Args:
         patience: tolerance for number of epochs when model can't
                   improve the specified score (e.g., loss, metric)
         mode: performance determination mode, the choices can be:
@@ -43,10 +43,10 @@ class EarlyStopping(object):
     def step(self, score: float) -> None:
         """Update states of es tracker.
 
-        Parameters:
+        Args:
             score: specified score in the current epoch
 
-        Return:
+        Returns:
             None
         """
         if self.tr_loss_thres is not None:

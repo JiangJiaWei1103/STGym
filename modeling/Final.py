@@ -20,7 +20,7 @@ LATENT_DGSL_SMOOTH = False  # Smooth DGS with running mean or not
 class HARDPurG(nn.Module):
     """Master network architecture, HARDPurG.
 
-    Parameters:
+    Args:
         sgsl_params: hyperparameters of static graph structure learner
         gspp_params: hyperparameters of graph structure post processor
         st_params: hyperparameters of spatio-temporal pattern extractor
@@ -139,12 +139,12 @@ class HARDPurG(nn.Module):
     ) -> Tuple[Tensor, Tensor, Tensor]:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: node feature matrix
             tid: time in day identifier
             diw: day in week identifier
 
-        Return:
+        Returns:
             output: prediction
             Ad: dynamic graph structure
             As: static graph structure
@@ -227,7 +227,7 @@ class HARDPurG(nn.Module):
 class _TemporalPatternInitializer(nn.Module):
     """Node-agnostic temporal pattern initializer.
 
-    Parameters:
+    Args:
         tran_state_h_dim: hidden dimension of transient state (C)
         common_dropout: common dropout
         rnn_h_dim: hidden dimension of RNN (C')
@@ -297,7 +297,7 @@ class _TemporalPatternInitializer(nn.Module):
 class _AuxInfoEncoder(nn.Module):
     """Auxiliary information encoder.
 
-    Parameters:
+    Args:
         node_emb_dim: dimension of static node embedding
         tid_emb_dim: dimension of time in day embedding
         diw_emb_dim: dimension of day in week embedding
@@ -375,7 +375,7 @@ class _SketchedGSLearner(nn.Module):
     GS learner aims at learning sketched graph structure, either static
     or dynamically changing over time.
 
-    Parameters:
+    Args:
         static: if True, the learned GS is static through time
         node_emb_dim: dimension of static or dynamic node embedding
         n_series: number of time series
@@ -458,7 +458,7 @@ class _SketchedGSLearner(nn.Module):
 class _GSPostProcessor(nn.Module):
     """Apply post processing to refine sketched adjacency matrix.
 
-    Parameters:
+    Args:
         act: non-linear activation applied to adjust edge weights
             *Note: Please specify None to retain linear activation
         k: number of top closest neighbors
@@ -513,10 +513,10 @@ class _GSPostProcessor(nn.Module):
     def _activate(self, A: Tensor) -> Tensor:
         """Apply non-linear transformation.
 
-        Parameters:
+        Args:
             A: adjacency matrices
 
-        Return:
+        Returns:
             A: activated adjacency matrices
         """
         A = self.act(A)
@@ -526,10 +526,10 @@ class _GSPostProcessor(nn.Module):
     def _sparsify(self, A: Tensor) -> Tensor:
         """Apply KNN-based sparsification.
 
-        Parameters:
+        Args:
             A: adjacency matrices
 
-        Return:
+        Returns:
             A: sparsified adjacency matrices
         """
         device = A.device
@@ -549,10 +549,10 @@ class _GSPostProcessor(nn.Module):
     def _symmetrize(self, A: Tensor) -> Tensor:
         """Apply symmetrization.
 
-        Parameters:
+        Args:
             A: adjacency matrices
 
-        Return:
+        Returns:
             A: symmetrized adjacency matrices
         """
         A = (A + A.transpose(1, 2)) / 2
@@ -565,14 +565,14 @@ class _GSPostProcessor(nn.Module):
         See https://math.stackexchange.com/questions/3035968/,
         https://github.com/tkipf/gcn/issues/142
 
-        Parameters:
+        Args:
             A: adjacency matrices
 
         Shape:
             A: (B, N, N), where B is the batch size and N is the number
                 of time series
 
-        Return:
+        Returns:
             A: normalized adjacency matrices
         """
         assert A.dim() == 3, "Shape of A doesn't match (B, N, N)."
@@ -596,7 +596,7 @@ class _GSPostProcessor(nn.Module):
 class _HARDPurGLayer(nn.Module):
     """Hop-aware rectified dynamic purging GNN layer.
 
-    Parameters:
+    Args:
         dy_wt_dim: dimension of weight matrix for latent DGSL
             *Note: Currently disabled
         node_emb_dim: dimension of dynamic node embedding
@@ -700,7 +700,7 @@ class _HARDPurGLayer(nn.Module):
     ) -> Any:
         """Forward pass.
 
-        Parameters:
+        Args:
             x_e_aux: integrated auxiliary information
             h_prev: dynamic node embedding of the previous layer (l-1)
                 *Note: This embedding contains time-dependent message
@@ -711,7 +711,7 @@ class _HARDPurGLayer(nn.Module):
             h_latent_s: hop-aware intermediate node embedding over As
                 from layer (l-1)
 
-        Return:
+        Returns:
             h_cur_cat: final node embedding skipped to output
             h_latent_d: hop-aware intermediate node embedding over Ad
                 for the next `_HARDPurGLayer`
@@ -774,7 +774,7 @@ class _HARDPurGLayer(nn.Module):
     ) -> nn.Module:
         """Build and return a single graph convolution block.
 
-        Parameters:
+        Args:
             gconv_type: type of graph convolution
             in_dim: input dimension of graph convolution
             h_dim: hidden dimension of graph convolution
@@ -786,7 +786,7 @@ class _HARDPurGLayer(nn.Module):
                 *Note: It's considered only when
                     `gconv_type`="hop_aware_rectify"
 
-        Return:
+        Returns:
             gconv: graph convolution block
         """
         gconv: nn.Module = None
@@ -811,7 +811,7 @@ class _HARDPurGLayer(nn.Module):
 class _HopAwareRecGConv(nn.Module):
     """Hop-aware rectified graph convolution module.
 
-    Parameters:
+    Args:
         c_in: input channel number
         c_out: output channel number
         gcn_depth: depth of graph convolution
@@ -865,13 +865,13 @@ class _HopAwareRecGConv(nn.Module):
     def forward(self, x: Tensor, A: Tensor, hs: Optional[List[Tensor]] = None) -> Tuple[Tensor, List[Tensor]]:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: node features
             A: adjacency matrix
             hs: hop-aware intermediate node embedding over A from layer
                 (l-1)
 
-        Return:
+        Returns:
             h: final node embedding
             h_latent: hop-aware intermediate node embedding over A for
                 the next `_HARDPurGLayer`

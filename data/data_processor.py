@@ -1,13 +1,13 @@
 """
-Data processor definitions.
+Data processor.
 Author: JiaWei Jiang
 
-This file contains the definition of data processor cleaning and
-processing raw data before entering modeling phase.
+Data processor aiming at further handling ready-to-use data with quick
+transformation, normalization and processing to prevent CV leakage.
+Note that it's not designed for complex data pipeline.
 """
 import logging
 import math
-import os
 import pickle
 from typing import Any, List, Optional, Tuple, Union
 
@@ -18,22 +18,21 @@ from pandas.api.types import is_datetime64_any_dtype
 from scipy.sparse import coo_matrix, csr_matrix
 from torch import Tensor
 
-from metadata import N_DAYS_IN_WEEK, N_SERIES, MTSFBerks, TrafBerks
-from paths import RAW_DATA_PATH
+from metadata import N_DAYS_IN_WEEK
 from utils.common import asym_norm, calculate_random_walk_matrix, calculate_scaled_laplacian, sym_norm
 from utils.scaler import MaxScaler, MinMaxScaler, StandardScaler
 
 
 class DataProcessor(object):
-    """Data processor processing raw data, and providing access to
-    processed data ready to be fed into modeling phase.
+    """Data processor.
 
-    Parameters:
-       file_path: path of the raw data
-           *Note: File reading supports .parquet extension in default
-               setting, which can be modified to customized one.
-        dataset_name: name of the dataset
-        dp_cfg: hyperparameters of data processor
+    The data processor aims at further handling ready-to-use data,
+    which has been well-processed in another independent data pipeline.
+
+    Args:
+        dp_cfg: The hyperparameters of data processor.
+
+    Attributes:
     """
 
     # https://stackoverflow.com/questions/59173744
@@ -42,15 +41,11 @@ class DataProcessor(object):
     _data_holdout: np.ndarray
     _data_test: np.ndarray
 
-    # The priori graph structure is optionally provided
     _priori_adj_mat: Optional[List[Union[Tensor, coo_matrix, csr_matrix]]] = None
 
-    def __init__(self, file_path: str, dataset_name: str, **dp_cfg: Any):
-        self.file_path = file_path
-        self.dataset_name = dataset_name
-
+    def __init__(self, **dp_cfg: Any):
         # Setup data processor
-        self._dp_cfg = dp_cfg
+        self.dp_cfg = dp_cfg
         self._setup()
 
         # Load raw data
@@ -59,38 +54,41 @@ class DataProcessor(object):
     def _setup(self) -> None:
         """Retrieve hyperparameters for data processing."""
         # Before data splitting
-        self.time_enc_params = self._dp_cfg["time_enc"]
-        self.holdout_ratio = self._dp_cfg["holdout_ratio"]
+        self.holdout_ratio = self.dp_cfg["holdout_ratio"]
+        self.time_enc_params = self.dp_cfg["time_enc"]
 
         # After data splitting
-        self.scaling = self._dp_cfg["scaling"]
-        self.priori_gs = self._dp_cfg["priori_gs"]
+        self.scaling = self.dp_cfg["scaling"]
+        self.priori_gs = self.dp_cfg["priori_gs"]
 
         # Common
-        self.n_series = N_SERIES[self.dataset_name]
+        # self.n_series = N_SERIES[self.dataset_name]
 
     def _load_data(self) -> None:
         """Load raw data."""
         logging.info("Load data...")
-        if self.dataset_name in MTSFBerks:
-            data_vals = np.loadtxt(self.file_path, delimiter=",")
-            self._df = pd.DataFrame(data_vals)
-        elif self.dataset_name in TrafBerks:
-            if self.file_path.endswith("npz"):
-                data_vals = np.load(self.file_path, allow_pickle=True)["data"][..., 0]
-                self._df = pd.DataFrame(data_vals)
-            else:
-                self._df = pd.read_hdf(self.file_path)
+        # ===
+        # Parse self.data_path and load data...
+        # ===
+        data_path = self.dp_cfg["data_path"]
+        data_vals = np.load(data_path, allow_pickle=True)["data"][..., 0]
+        self._df = pd.DataFrame(data_vals)
+        # if self.dataset_name in MTSFBerks:
+        #     data_vals = np.loadtxt(self.file_path, delimiter=",")
+        #     self._df = pd.DataFrame(data_vals)
+        # elif self.dataset_name in TrafBerks:
+        #     if self.file_path.endswith("npz"):
+        #         data_vals = np.load(self.file_path, allow_pickle=True)["data"][..., 0]
+        #         self._df = pd.DataFrame(data_vals)
+        #     else:
+        #         self._df = pd.read_hdf(self.file_path)
 
         logging.info(f"\t>> Data shape: {self._df.shape}")
-        assert self._df.shape[1] == self.n_series, "#Series doesn't match."
+        # assert self._df.shape[1] == self.n_series, "#Series doesn't match."
 
     def run_before_splitting(self) -> None:
         """Clean and process data before data splitting (i.e., on raw
         static DataFrame).
-
-        Return:
-            None
         """
         logging.info("Run data cleaning and processing before data splitting...")
 
@@ -105,26 +103,30 @@ class DataProcessor(object):
         if self.priori_gs["type"] is not None:
             self._init_priori_gs()
 
+        logging.info("Done.")
+
     def run_after_splitting(self, data_tr: np.ndarray, data_val: np.ndarray) -> Tuple[np.ndarray, np.ndarray, Any]:
         """Clean and process data after data splitting to avoid data
         leakage issue.
 
         Note that data processing is prone to data leakage, such as
-        fitting the scaler with the whole dataset (including training).
+        fitting the scaler with the whole dataset.
 
-        Parameters:
-            data_tr: training data
-            data_val: validation data
+        Args:
+            data_tr: The training data.
+            data_val: The validation data.
 
-        Return:
-            data_tr: processed training data
-            data_val: processed validation data
-            scaler: scaling object
+        Returns:
+            A tuple (data_tr, data_val, scaler), where data_tr is the
+            processed training data, data_val is the processed valid
+            data, and scaler is any scaling object.
         """
         logging.info("Run data cleaning and processing after data splitting...")
         scaler = None
         if self.scaling is not None:
             data_tr, data_val, scaler = self._scale(data_tr, data_val)
+
+        logging.info("Done.")
 
         return data_tr, data_val, scaler
 
@@ -169,19 +171,17 @@ class DataProcessor(object):
     def _init_priori_gs(self) -> None:
         """Initialize the priori graph structure.
 
-        See https://github.com/nnzhan/Graph-WaveNet/ .
-
-        Return:
-            None
+        See https://github.com/nnzhan/Graph-WaveNet/.
         """
         logging.info(f"\t>> Initialize pre-defined graph structure with type {self.priori_gs['type']}...")
         priori_gs_type = self.priori_gs["type"]
 
         if priori_gs_type == "identity":
-            self._priori_adj_mat = [torch.eye(self.n_series)]
+            # self._priori_adj_mat = [torch.eye(self.n_series)]
+            self._priori_adj_mat = torch.eye(1)
         else:
             adj_mat = self._load_adj_mat()
-            assert self.n_series == adj_mat.shape[0], "Shape of the adjacency matrix is wrong."
+            # assert self.n_series == adj_mat.shape[0], "Shape of the adjacency matrix is wrong."
 
             if priori_gs_type == "sym_norm":
                 self._priori_adj_mat = [sym_norm(adj_mat)]
@@ -215,12 +215,16 @@ class DataProcessor(object):
     def _load_adj_mat(self) -> np.ndarray:
         """Load hand-crafted adjacency matrix.
 
-        See https://github.com/nnzhan/Graph-WaveNet/ .
+        See https://github.com/nnzhan/Graph-WaveNet/.
 
-        Return:
-            adj_mat: hand-crafted (pre-defined) adjacency matrix
+        Returns:
+            The hand-crafted (pre-defined) adjacency matrix.
         """
-        adj_mat_file_path = os.path.join(RAW_DATA_PATH, self.dataset_name, f"{self.dataset_name}_adj.pkl")
+        # ===
+        # Parse adj path and load
+        # adj_mat_file_path = os.path.join(RAW_DATA_PATH, self.dataset_name, f"{self.dataset_name}_adj.pkl")
+        adj_mat_file_path = ""
+        # ===
 
         try:
             with open(adj_mat_file_path, "rb") as f:
@@ -242,14 +246,14 @@ class DataProcessor(object):
     ) -> Tuple[np.ndarray, np.ndarray, Any]:
         """Scale the data.
 
-        Parameters:
-            data_tr: training data
-            data_val: validation data
+        Args:
+            data_tr: The training data.
+            data_val: The validation data.
 
-        Return:
-            data_tr: scaled training data
-            data_val: scaled validation data
-            scaler: scaling object
+        Returns:
+            A tuple (data_tr, data_val, scaler), where data_tr is the
+            scaled training data, data_val is the scaled valid data,
+            and scaler is any scaling object.
         """
         logging.info(f"\t>> Scale data using {self.scaling} scaler...")
 
@@ -282,7 +286,7 @@ class _TimeEncoder(object):
     * N: number of time series
     * C: number of channels (i.e., features)
 
-    Parameters:
+    Args:
         add_tid: if True, add "Time in day" identifier as the auxiliary
             feature
         add_diw: if True, add "Day in week" identifier as the auxiliary
@@ -321,10 +325,10 @@ class _TimeEncoder(object):
 
         Time stamp encodings are concatenated along the channel dim.
 
-        Parameters:
+        Args:
             x: input time series matrix
 
-        Return:
+        Returns:
             inputs: input time series matrix with time stamp encodings
 
         Shape:

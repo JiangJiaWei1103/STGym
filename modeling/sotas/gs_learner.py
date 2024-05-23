@@ -13,7 +13,7 @@ from torch import Tensor
 class GWNetGSLearner(nn.Module):
     """Graph structure learner of GWNet.
 
-    Parameters:
+    Args:
         n_nodes: number of nodes (i.e., series)
     """
 
@@ -26,7 +26,7 @@ class GWNetGSLearner(nn.Module):
     def forward(self) -> Tensor:
         """Forward pass.
 
-        Return:
+        Returns:
             A: self-adaptive adjacency matrix
 
         Shape:
@@ -40,7 +40,7 @@ class GWNetGSLearner(nn.Module):
 class MTGNNGSLearner(nn.Module):
     """Graph structure learner of MTGNN.
 
-    Parameters:
+    Args:
         n_nodes: number of nodes (i.e., series)
         node_emb_dim: node embedding dimension
         alpha: control the saturation rate of the activation function
@@ -71,11 +71,11 @@ class MTGNNGSLearner(nn.Module):
     def forward(self, node_idx: Tensor, node_feat: Optional[Tensor] = None) -> None:
         """Forward pass.
 
-        Parameters:
+        Args:
             node_idx: node indices
             node_feat: static node feature matrix
 
-        Return:
+        Returns:
             A: self-adaptive adjacency matrix
 
         Shape:

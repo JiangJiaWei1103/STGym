@@ -20,7 +20,7 @@ from modeling.sotas.sub_layers import Linear2d
 class GWNet(nn.Module):
     """GWNet framework.
 
-    Parameters:
+    Args:
         in_dim: input feature dimension
         skip_dim: output dimension of skip connection
         end_dim: hidden dimension of output layer
@@ -94,11 +94,11 @@ class GWNet(nn.Module):
     def forward(self, x: Tensor, As: List[Tensor], **kwargs: Any) -> Tuple[Tensor, None, None]:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input sequence
             As: list of adjacency matrices
 
-        Return:
+        Returns:
             output: prediction
 
         Shape:

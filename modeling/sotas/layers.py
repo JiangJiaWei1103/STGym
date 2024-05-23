@@ -17,7 +17,7 @@ from .sub_layers import DiffusionConvLayer, DilatedInception, GatedTCN, InfoProp
 class DCGRU(nn.Module):
     """Diffusion convolutional gated recurrent unit.
 
-    Parameters:
+    Args:
         in_dim: input feature dimension
         h_dim: hidden state dimension
         n_adjs: number of adjacency matrices
@@ -47,12 +47,12 @@ class DCGRU(nn.Module):
     def forward(self, x: Tensor, As: List[Tensor], h_0: Optional[Tensor] = None) -> Tuple[Tensor, Tensor]:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input sequence
             As: list of adjacency matrices
             h_0: initial hidden state
 
-        Return:
+        Returns:
             output: hidden state for each lookback time step
             h_n: last hidden state
 
@@ -100,7 +100,7 @@ class GWNetLayer(nn.Module):
     One layer is constructed by a graph convolution layer and a gated
     temporal convolution layer.
 
-    Parameters:
+    Args:
         in_dim: input feature dimension
         h_dim: hidden dimension
         kernel_size: kernel size
@@ -139,11 +139,11 @@ class GWNetLayer(nn.Module):
     def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input sequence
             As: list of adjacency matrices
 
-        Return:
+        Returns:
             h_tcn: intermediate node embedding output by GatedTCN
             h: output node embedding
 
@@ -175,7 +175,7 @@ class MTGNNLayer(TConvBaseModule):
     One layer is constructed by a mix-hop propagation layer and a
     dilated inception layer.
 
-    Parameters:
+    Args:
         n_layers: number of stacked layers till the current layer
         n_series: number of series
         in_len: input sequence length
@@ -242,11 +242,11 @@ class MTGNNLayer(TConvBaseModule):
     def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input sequence
             As: list of adjacency matrices
 
-        Return:
+        Returns:
             h_tcn: intermediate node embedding output by dilated
                 inception layer
             h: output node embedding

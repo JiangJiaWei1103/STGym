@@ -2,34 +2,30 @@
 Common utility functions used in training and evaluation processes.
 Author: JiaWei Jiang
 """
-import logging
-import os
 import time
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Dict, List
 
 import numpy as np
-import scipy.sparse as sp
+import scipy as sp
 import torch
-import yaml
+import wandb
+from omegaconf import DictConfig, OmegaConf
 from scipy.sparse import coo_matrix, csr_matrix, linalg
 from torch import Tensor
 from torch.nn import Module
-
-import wandb
-from paths import DUMP_PATH, DUMP_PATH_DEBUG
 
 
 def count_params(model: Module) -> str:
     """Count number of parameters in model.
 
-    Parameters:
+    Args:
         model: model instance
 
-    Return:
-        n_params: number of parameters in model, represented in
-            scientific notation
+    Returns:
+        The number of parameters in model, represented in scientific
+        notation.
     """
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     n_params = f"{Decimal(str(n_params)):.4E}"
@@ -37,29 +33,11 @@ def count_params(model: Module) -> str:
     return n_params
 
 
-def dump_wnb(project_name: str, cfg: Dict[str, Any], exp_id: str, debug: bool = False) -> None:
-    """Dump and push experiment output objects.
+def dictconfig2dict(cfg: DictConfig) -> Dict:
+    """Convert OmegaConf config object to primitive container."""
+    cfg_resolved = OmegaConf.to_container(cfg, resolve=True)
 
-    Parameters:
-        project_name: name of the project
-        cfg: configuration of entire experiment
-        exp_id: experiment identifier
-        debug: if True, debug mode is on
-
-    Return:
-        None
-    """
-    dump_path = DUMP_PATH if not debug else DUMP_PATH_DEBUG
-    cfg_dump_path = os.path.join(dump_path, "cfg.yaml")
-    with open(cfg_dump_path, "w") as f:
-        yaml.dump(cfg, f)
-    dump_entry = wandb.init(project=project_name, group=exp_id, job_type="dumping")
-    model_name = cfg["common"]["model_name"]
-    artif = wandb.Artifact(name=model_name.upper(), type="output")
-    artif.add_dir(dump_path)
-    dump_entry.log_artifact(artif)  # type: ignore
-    # (tmp. workaround)
-    wandb.finish()
+    return cfg_resolved
 
 
 class Profiler(object):
@@ -80,14 +58,54 @@ class Profiler(object):
             self.t_elapsed[self.proc_type].append(time.time() - self.t_start)
 
     def summarize(self, log_wnb: bool = True) -> None:
-        logging.info("\n=====Profile Summary=====")
+        print("\n=====Profile Summary=====")
         for proc_type, t_elapsed in self.t_elapsed.items():
             t_avg = np.mean(t_elapsed)
             t_std = np.std(t_elapsed)
-            logging.info(f"{proc_type.upper()} takes {t_avg:.2f} ± {t_std:.2f} (sec/epoch)")
+            print(f"{proc_type.upper()} takes {t_avg:.2f} ± {t_std:.2f} (sec/epoch)")
 
             if log_wnb:
                 wandb.log({f"{proc_type}_time": {"avg": t_avg, "t_std": t_std}})
+
+
+class AvgMeter(object):
+    """Meter computing and storing current and average values.
+
+    Args:
+        name: name of the value to track
+    """
+
+    _val: float
+    _sum: float
+    _cnt: int
+    _avg: float
+
+    def __init__(self, name: str) -> None:
+        self.val_name = name
+
+        self._reset()
+
+    def update(self, val: float, n: int = 1) -> None:
+        self._val = val
+        self._sum += val * n
+        self._cnt += n
+        self._avg = self._sum / self._cnt
+
+    @property
+    def val_cur(self) -> float:
+        """Return current value."""
+        return self._val
+
+    @property
+    def avg_cur(self) -> float:
+        """Return current average value."""
+        return self._avg
+
+    def _reset(self) -> None:
+        self._val = 0
+        self._avg = 0
+        self._sum = 0
+        self._cnt = 0
 
 
 # The utilities below are from https://github.com/nnzhan/Graph-WaveNet

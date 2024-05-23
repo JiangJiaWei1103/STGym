@@ -45,7 +45,7 @@ class BenchmarkDataset(Dataset):
 
     Data contains only time series numeric values.
 
-    Parameters:
+    Args:
         data: processed data
         t_window: lookback time window, denoted by T
         horizon: predicting horizon, denoted by Q
@@ -94,12 +94,12 @@ class BenchmarkDataset(Dataset):
         self.y = np.stack(y)  # (M, N), Q = 1 for single-horizon
 
     def _get_windowed_sample(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        """Return (X, y) sample based on idx passed into __getitem__.
+        """Returns (X, y) sample based on idx passed into __getitem__.
 
-        Parameters:
+        Args:
             idx: index of the sample to retrieve
 
-        Return:
+        Returns:
             X: X sample corresponding to the given index
             y: y sample corresponding to the given index
         """
@@ -116,7 +116,7 @@ class TrafficDataset(Dataset):
     forecasting, and the default setting is 12 predicting horizons.
     That is, forecasting is done for one hour later in the future.
 
-    Parameters:
+    Args:
         data: processed data
         t_window: lookback time window
         horizon: predicting horizon
@@ -167,15 +167,15 @@ class TrafficDataset(Dataset):
         self.y = np.stack(y)  # (M, Q, N, C)
 
     def _get_windowed_sample(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        """Return (X, y) sample based on idx passed into __getitem__.
+        """Returns (X, y) sample based on idx passed into __getitem__.
 
         Different from single-step forecasting, y here for multi-step
         forecasting is a sequence.
 
-        Parameters:
+        Args:
             idx: index of the sample to retrieve
 
-        Return:
+        Returns:
             X: X sample corresponding to the given index
             y: y sample corresponding to the given index
         """

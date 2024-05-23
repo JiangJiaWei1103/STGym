@@ -22,7 +22,7 @@ from modeling.sotas.layers import DCGRU
 class DCRNN(nn.Module):
     """DCRNN framework.
 
-    Parameters:
+    Args:
         n_layers: number of DCRNN layers
         enc_in_dim: input dimension of encoder
         dec_in_dim: input dimension of decoder
@@ -81,7 +81,7 @@ class DCRNN(nn.Module):
     ) -> Tuple[Tensor, None, None]:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input sequence
             As: list of adjacency matrices
             ycl: ground truth observation
@@ -138,11 +138,11 @@ class _Encoder(nn.Module):
     def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input seqeunce
             As: list of adjacency matrices
 
-        Return:
+        Returns:
             hs: layer-wise last hidden state
 
         Shape:
@@ -191,14 +191,14 @@ class _Decoder(nn.Module):
     def forward(self, hs: Tensor, As: List[Tensor], ycl: Tensor, teacher_forcing_ratio: float = 0.5) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Args:
             hs: layer-wise last hidden state of encoder
             As: list of adjacency matrices
             ycl: groud truth observation
             teacher_forcing_ratio: probability to feed the previous
                 ground truth as input
 
-        Return:
+        Returns:
             output: prediction
 
         Shape:

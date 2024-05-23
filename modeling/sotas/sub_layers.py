@@ -43,11 +43,11 @@ class DiffusionConvLayer(nn.Module):
     def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input node features
             As: list of adjacency matrices
 
-        Return:
+        Returns:
             h: diffusion convolution output
 
         Shape:
@@ -80,7 +80,7 @@ class DiffusionConvLayer(nn.Module):
 class InfoPropLayer(nn.Module):
     """Information propagation layer used in GWNet and MTGNN.
 
-    Parameters:
+    Args:
         flow: flow direction of the message passing, the choices are
             {"src_to_tgt", "tgt_to_src"}
         mix_prop: if True, mix-hop propagation in MTGNN is used
@@ -123,7 +123,7 @@ class InfoPropLayer(nn.Module):
             x: input node features
             As: list of adjacency matrices
 
-        Return:
+        Returns:
             h: graph convolution output
 
         Shape:
@@ -177,11 +177,11 @@ class GCN2d(nn.Module):
     def forward(self, x: Tensor, A: Tensor) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input node embeddings
             A: adjacency matrix
 
-        Return:
+        Returns:
             h: output node embeddings
 
         Shape:
@@ -218,7 +218,7 @@ class GCN2d(nn.Module):
 class GatedTCN(nn.Module):
     """Gated temporal convolution layer.
 
-    Parameters:
+    Args:
         conv_module: customized convolution module
     """
 
@@ -257,10 +257,10 @@ class GatedTCN(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input sequence
 
-        Return:
+        Returns:
             h: output sequence
 
         Shape:
@@ -300,10 +300,10 @@ class DilatedInception(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input sequence
 
-        Return:
+        Returns:
             h: output sequence
 
         Shape:
@@ -341,10 +341,10 @@ class Linear2d(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass.
 
-        Parameters:
+        Args:
             x: input
 
-        Return:
+        Returns:
             output: output
 
         Shape:

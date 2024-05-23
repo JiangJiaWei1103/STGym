@@ -2,7 +2,7 @@
 Custom trainer definitions for different training processes.
 Author: JiaWei Jiang
 
-This file contains diversified trainers, whose training logics are
+Definitions of diversified trainers, whose core training logics are
 inherited from `BaseTrainer`.
 
 * [ ] Pack input data in Dict.
@@ -36,7 +36,7 @@ class MainTrainer(BaseTrainer):
     processes (e.g., model input, advanced data processing, graph node
     sampling, customized multitask criterion definition).
 
-    Parameters:
+    Args:
         logger: message logger
         proc_cfg: hyperparameters for training and evaluation processes
         model: model instance
@@ -84,18 +84,20 @@ class MainTrainer(BaseTrainer):
         self.eval_loader = eval_loader if eval_loader else train_loader
         self.priori_gs = None if priori_gs is None else [A.to(self.device) for A in priori_gs]
         self.scaler = scaler
-        self.rescale = proc_cfg["loss_fn"]["rescale"]
+        # self.rescale = proc_cfg["loss_fn"]["rescale"]
+        self.rescale = True
 
         # Curriculum learning
-        if self.proc_cfg["loss_fn"]["cl"] is not None:
-            self._cl = CLTracker(**self.proc_cfg["loss_fn"]["cl"])
-        else:
-            self._cl = None
+        # if self.proc_cfg["loss_fn"]["cl"] is not None:
+        #     self._cl = CLTracker(**self.proc_cfg["loss_fn"]["cl"])
+        # else:
+        #     self._cl = None
+        self._cl = None
 
     def _train_epoch(self) -> float:
         """Run training process for one epoch.
 
-        Return:
+        Returns:
             train_loss_avg: average training loss over batches
         """
         train_loss_total = 0
@@ -155,11 +157,11 @@ class MainTrainer(BaseTrainer):
     ) -> Tuple[float, Dict[str, float], Optional[Tensor]]:
         """Run evaluation process for one epoch.
 
-        Parameters:
+        Args:
             return_output: whether to return inference result of model
             datatype: type of the dataset to evaluate
 
-        Return:
+        Returns:
             eval_loss_avg: average evaluation loss over batches
             eval_result: evaluation performance report
             y_pred: inference result
@@ -217,7 +219,7 @@ class MainTrainer(BaseTrainer):
 class CLTracker(object):
     """Tracker for curriculum learning.
 
-    Parameters:
+    Args:
         lv_up_period: task levels up every `lv_up_period` iterations if
             the current task level is lower than `task_lv_max`
         task_lv_max: hardest task level
@@ -231,13 +233,13 @@ class CLTracker(object):
         self._task_lv = 1
 
     def get_iter(self) -> int:
-        """Return the current iteration."""
+        """Returns the current iteration."""
         return self._iter
 
     def get_task_lv(self) -> int:
-        """Return the current task level.
+        """Returns the current task level.
 
-        Return:
+        Returns:
             self._task_lv: current task level
         """
         return self._task_lv

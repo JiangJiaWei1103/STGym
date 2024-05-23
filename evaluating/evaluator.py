@@ -20,7 +20,7 @@ class Evaluator(object):
     Following is a simple illustration of evaluator used in regression
     task.
 
-    Parameters:
+    Args:
         metric_names: evaluation metrics
         horiz_cuts: predicting horizon cutoff
             *Note: This argument indicates how many predicting
@@ -44,7 +44,7 @@ class Evaluator(object):
     ) -> Dict[str, float]:
         """Run evaluation using pre-specified metrics.
 
-        Parameters:
+        Args:
             y_true: groundtruths
             y_pred: predicting values
             scaler: scaling object
@@ -52,7 +52,7 @@ class Evaluator(object):
                     models trained on y with different scales, the
                     inverse tranformation is needed.
 
-        Return:
+        Returns:
             eval_result: evaluation performance report
         """
         if scaler is not None:
@@ -96,12 +96,12 @@ class Evaluator(object):
     def _rescale_y(self, y_pred: Tensor, y_true: Tensor, scaler: Any) -> Tuple[Tensor, Tensor]:
         """Rescale y to the original scale.
 
-        Parameters:
+        Args:
             y_pred: predicting results
             y_true: groundtruths
             scaler: scaling object
 
-        Return:
+        Returns:
             y_pred: rescaled predicting results
             y_true: rescaled groundtruths
         """
@@ -128,11 +128,11 @@ class Evaluator(object):
     def _RMSE(self, y_pred: Tensor, y_true: Tensor) -> float:
         """Root mean squared error.
 
-        Parameters:
+        Args:
             y_pred: predicting results
             y_true: groudtruths
 
-        Return:
+        Returns:
             rmse: root mean squared error
         """
         mse = nn.MSELoss()
@@ -143,11 +143,11 @@ class Evaluator(object):
     def _MAE(self, y_pred: Tensor, y_true: Tensor) -> float:
         """Mean absolute error.
 
-        Parameters:
+        Args:
             y_pred: predicting results
             y_true: groudtruths
 
-        Return:
+        Returns:
             mae: root mean squared error
         """
         mae = nn.L1Loss()(y_pred, y_true).item()
@@ -157,11 +157,11 @@ class Evaluator(object):
     def _RRSE(self, y_pred: Tensor, y_true: Tensor) -> float:
         """Root relative squared error.
 
-        Parameters:
+        Args:
             y_pred: predicting results
             y_true: groudtruths
 
-        Return:
+        Returns:
             rrse: root relative squared error
         """
         #         gt_mean = torch.mean(y_true)
@@ -177,11 +177,11 @@ class Evaluator(object):
     def _RAE(self, y_pred: Tensor, y_true: Tensor) -> float:
         """Relative absolute error.
 
-        Parameters:
+        Args:
             y_pred: predicting results
             y_true: groudtruths
 
-        Return:
+        Returns:
             rae: relative absolute error
         """
         gt_mean = torch.mean(y_true)
@@ -199,11 +199,11 @@ class Evaluator(object):
         across val and test set with size of splitting 6:2:2), corr of
         such series are dropped to avoid situations like +-inf or NaN.
 
-        Parameters:
+        Args:
             y_pred: predicting results
             y_true: groudtruths
 
-        Return:
+        Returns:
             corr: empirical correlation coefficient
         """
         pred_mean = torch.mean(y_pred, dim=0)
@@ -226,11 +226,11 @@ class Evaluator(object):
     def _MMAE(self, y_pred: Tensor, y_true: Tensor) -> float:
         """Masked mean absolute error.
 
-        Parameters:
+        Args:
             y_pred: predicting results
             y_true: groudtruths
 
-        Return:
+        Returns:
             mmae: masked mean absolute error
         """
         mmae = MaskedLoss("l1")(y_pred, y_true).item()
@@ -240,11 +240,11 @@ class Evaluator(object):
     def _MRMSE(self, y_pred: Tensor, y_true: Tensor) -> float:
         """Masked root mean square error.
 
-        Parameters:
+        Args:
             y_pred: predicting results
             y_true: groudtruths
 
-        Return:
+        Returns:
             mrmse: masked root mean square error
         """
         mrmse = torch.sqrt(MaskedLoss("l2")(y_pred, y_true)).item()
@@ -254,11 +254,11 @@ class Evaluator(object):
     def _MMAPE(self, y_pred: Tensor, y_true: Tensor) -> float:
         """Masked mean absolute percentage error.
 
-        Parameters:
+        Args:
             y_pred: predicting results
             y_true: groudtruths
 
-        Return:
+        Returns:
             mmape: masked mean absolute percentage error
         """
         mmape = MaskedLoss("mape")(y_pred, y_true).item()

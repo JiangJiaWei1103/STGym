@@ -10,6 +10,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
 
+import wandb
 from torch import Tensor
 from torch.nn import Module
 from torch.nn.modules.loss import _Loss
@@ -17,7 +18,6 @@ from torch.optim import Optimizer, lr_scheduler
 from torch.optim.lr_scheduler import _LRScheduler
 from torch.utils.data import DataLoader
 
-import wandb
 from evaluating.evaluator import Evaluator
 from utils.common import Profiler
 from utils.early_stopping import EarlyStopping
@@ -27,7 +27,7 @@ from utils.model_checkpoint import ModelCheckpoint
 class BaseTrainer:
     """Base class for all customized trainers.
 
-    Parameters:
+    Args:
         logger: message logger
         proc_cfg: hyperparameters for training and evaluation processes
         model: model instance
@@ -72,7 +72,8 @@ class BaseTrainer:
         self.device = proc_cfg["device"]
         self.epochs = proc_cfg["epochs"]
         # If True, learning rate scheduler steps per batches
-        self.step_per_batch = proc_cfg["solver"]["lr_skd"]["step_per_batch"]
+        # self.step_per_batch = proc_cfg["solver"]["lr_skd"]["step_per_batch"]
+        self.step_per_batch = True
 
         # Model checkpoint
         self.model_ckpt = ModelCheckpoint(ckpt_path, **proc_cfg["model_ckpt"])
@@ -80,15 +81,15 @@ class BaseTrainer:
         self._iter = 0
         self._track_best_model = True  # (Deprecated)
 
-    def train_eval(self, proc_id: int) -> Tuple[Module, Tensor]:
+    def train_eval(self, proc_id: str) -> Tuple[Module, Tensor]:
         """Run train and evaluation processes for either one fold or
         one random seed (commonly used when training on whole dataset).
 
-        Parameters:
+        Args:
             proc_id: identifier of the current process, indicating
                 current fold number or random seed.
 
-        Return:
+        Returns:
             None
         """
         best_model, best_y_pred = None, None
@@ -129,12 +130,12 @@ class BaseTrainer:
     def test(self, proc_id: int, test_loader: DataLoader) -> Tensor:
         """Run evaluation process on unseen test data.
 
-        Parameters:
+        Args:
             proc_id: identifier of the current process, indicating
                 current fold number
             test_loader: test data loader
 
-        Return:
+        Returns:
             y_pred: prediction on test set
         """
         self.eval_loader = test_loader
@@ -148,7 +149,7 @@ class BaseTrainer:
     def _train_epoch(self) -> Union[float, Dict[str, float]]:
         """Run training process for one epoch.
 
-        Return:
+        Returns:
             train_loss_avg: average training loss over batches
                 *Note: If multitask is used, returned object will be
                     a dictionary containing losses of subtasks and the
@@ -164,11 +165,11 @@ class BaseTrainer:
     ) -> Tuple[float, Dict[str, float], Optional[Tensor]]:
         """Run evaluation process for one epoch.
 
-        Parameters:
+        Args:
             return_output: whether to return inference result of model
             datatype: type of the dataset to evaluate
 
-        Return:
+        Returns:
             eval_loss_avg: average evaluation loss over batches
             eval_result: evaluation performance report
             y_pred: inference result
@@ -185,7 +186,7 @@ class BaseTrainer:
     ) -> None:
         """Log message of training process.
 
-        Parameters:
+        Args:
             epoch: current epoch number
             train_loss: training loss
             val_loss: validation loss
@@ -225,7 +226,7 @@ class BaseTrainer:
     def _run_final_eval(self) -> Tuple[Dict[str, Dict[str, float]], Dict[str, Tensor]]:
         """Run final evaluation process with the best checkpoint.
 
-        Return:
+        Returns:
             final_prf_report: performance report of final evaluation
             y_preds: inference results on different datasets
         """
@@ -261,10 +262,10 @@ class BaseTrainer:
     def _log_best_prf(self, prf_report: Dict[str, Any]) -> None:
         """Log performance evaluated with the best model checkpoint.
 
-        Parameters:
+        Args:
             prf_report: performance report
 
-        Return:
+        Returns:
             None
         """
         import json

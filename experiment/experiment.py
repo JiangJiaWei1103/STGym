@@ -2,61 +2,65 @@
 Experiment tracker.
 Author: JiaWei Jiang
 
-This file contains the definition of experiment tracker for experiment
-configuration, message logging, object dumping, etc.
+This experiment tracker is mainly used to configure the experiment,
+handle message logging, provide interface for output object dumping.
 """
 from __future__ import annotations
 
-import os
 import pickle
-from argparse import Namespace
 from datetime import datetime
+from pathlib import Path
 from types import TracebackType
 from typing import Any, Dict, Optional, Type, Union
 
 import numpy as np
 import pandas as pd
+import rich
 import torch
-import yaml
+import wandb
+from omegaconf import OmegaConf
+from omegaconf.dictconfig import DictConfig
+from rich.syntax import Syntax
+from rich.tree import Tree
 from sklearn.base import BaseEstimator
 from torch.nn import Module
 from wandb.sdk.lib import RunDisabled
 from wandb.sdk.wandb_run import Run
 
-import wandb
-from config.config import setup_dp, setup_model, setup_proc
-from paths import DUMP_PATH
+from utils.common import dictconfig2dict
 from utils.logger import Logger
 
 
 class Experiment(object):
     """Experiment tracker.
 
-    Parameters:
-        args: arguments driving the designated process
-        log_file: file to log experiment process
-        infer: if True, the experiment is for inference only
+    Args:
+        cfg: The configuration driving the designated process.
+        log_file: The file to log experiment process.
+        infer: If True, the experiment is for inference only.
+
+    Attributes:
+        exp_id: The unique experiment identifier.
+        exp_dump_path: Output path of the experiment.
+        ckpt_path: Path of model checkpoints.
     """
 
-    cfg: Dict[str, Dict[str, Any]]
-    model_params: Dict[str, Any]
-    fit_params: Optional[Dict[str, Any]]
-    exp_dump_path: str
+    exp_dump_path: Path
+    ckpt_path: Path
     _cv_score: float = 0
 
     def __init__(
         self,
-        args: Namespace,
+        cfg: DictConfig,
         log_file: str = "train_eval.log",
         infer: bool = False,
     ) -> None:
         # Setup experiment identifier
-        if args.exp_id is None:
-            # Use time stamp as the experiment identifier
-            args.exp_id = datetime.now().strftime("%m%d-%H_%M_%S")
-        self.exp_id = args.exp_id
+        if cfg.exp_id is None:
+            cfg.exp_id = datetime.now().strftime("%m%d-%H_%M_%S")
+        self.exp_id = cfg.exp_id
 
-        self.args = args
+        self.cfg = cfg
         self.log_file = log_file
         self.infer = infer
 
@@ -64,30 +68,46 @@ class Experiment(object):
         self._mkbuf()
 
         # Configure the experiment
-        if not infer:
-            self.dp_cfg = setup_dp()
-            self.model_cfg = setup_model(args.model_name)
-            self.proc_cfg = setup_proc()
-            self._parse_model_cfg()
-            self._agg_cfg()
-        else:
+        if infer:
             self._evoke_cfg()
+        else:
+            self.data_cfg = cfg.data
+            self.model_cfg = cfg.model
+            self.trainer_cfg = cfg.trainer
 
         # Setup experiment logger
-        if args.use_wandb:
-            assert args.project_name is not None, "Please specify project name of wandb."
-            self.exp_supr = wandb.init(
-                project=args.project_name,
-                config=self.cfg,
-                group=self.exp_id,
-                job_type="supervise",
-                name="supr",
-            )
-        self.logger = Logger(logging_file=os.path.join(self.exp_dump_path, log_file)).get_logger()
+        if cfg.use_wandb:
+            assert cfg.project_name is not None, "Please specify project name of wandb."
+            self.exp_supr = self.add_wnb_run(cfg=cfg, job_type="supervise", name="supr")
+        self.logger = Logger(logging_file=self.exp_dump_path / log_file).get_logger()
+
+    def _mkbuf(self) -> None:
+        """Make local buffer to dump experiment output objects."""
+        # Create parent dump path
+        dump_path = Path(self.cfg["paths"]["DUMP_PATH"])
+        dump_path.mkdir(parents=True, exist_ok=True)
+
+        self.exp_dump_path = dump_path / self.exp_id
+        self.ckpt_path = self.exp_dump_path / "models"
+
+        if self.infer:
+            assert self.exp_dump_path.exists(), "There exists no output objects for your specified experiment."
+        else:
+            self.exp_dump_path.mkdir(parents=True, exist_ok=False)
+            for sub_dir in ["config", "trafos", "models", "preds", "feats", "imps"]:
+                sub_path = self.exp_dump_path / sub_dir
+                sub_path.mkdir(parents=True, exist_ok=False)
+            for pred_type in ["oof", "holdout", "final"]:
+                sub_path = self.exp_dump_path / "preds" / pred_type
+                sub_path.mkdir(parents=True, exist_ok=False)
+
+    def _evoke_cfg(self) -> None:
+        """Retrieve configuration of the pre-dumped experiment."""
+        pass
 
     def __enter__(self) -> Experiment:
-        self._log_exp_metadata()
-        if self.args.use_wandb:
+        self._log_cfg()
+        if self.cfg.use_wandb:
             self.exp_supr.finish()
 
         return self
@@ -104,65 +124,62 @@ class Experiment(object):
         """Log the provided message."""
         self.logger.info(msg)
 
-    def dump_cfg(self, cfg: Dict[str, Any], file_name: str) -> None:
+    def dump_cfg(self, cfg: Union[DictConfig, Dict[str, Any]], file_name: str) -> None:
         """Dump configuration under corresponding path.
 
-        Parameters:
-            cfg: configuration
-            file_name: config name with .yaml extension
-
-        Return:
-            None
+        Args:
+            cfg: The configuration object.
+            file_name: The config name with .yaml extension.
         """
         file_name = file_name if file_name.endswith(".yaml") else f"{file_name}.yaml"
-        dump_path = os.path.join(self.exp_dump_path, "config", file_name)
-        with open(dump_path, "w") as f:
-            yaml.dump(cfg, f)
+        dump_path = self.exp_dump_path / "config" / file_name
+        if isinstance(cfg, Dict):
+            cfg = OmegaConf.create(cfg)
+        OmegaConf.save(cfg, dump_path)
 
     def dump_ndarr(self, arr: np.ndarray, file_name: str) -> None:
         """Dump np.ndarray to corresponding path.
 
-        Parameters:
-            arr: array to dump
-            file_name: array name with .npy extension
-
-        Return:
-            None
+        Args:
+            arr: The numpy array.
+            file_name: The array name with .npy extension.
         """
-        dump_path = os.path.join(self.exp_dump_path, "preds", file_name)
+        dump_path = self.exp_dump_path / "preds" / file_name
         np.save(dump_path, arr)
 
     def dump_df(self, df: pd.DataFrame, file_name: str) -> None:
         """Dump DataFrame (e.g., feature imp) to corresponding path.
 
-        Parameters:
-            df: DataFrame to dump
-            file_name: df name with .csv (by default) extension
+        Args:
+            df: The DataFrame.
+            file_name: The df name with .csv (by default) extension.
         """
         if "." not in file_name:
             file_name = f"{file_name}.csv"
-        dump_path = os.path.join(self.exp_dump_path, file_name)
+        dump_path = self.exp_dump_path / file_name
 
         if file_name.endswith(".csv"):
             df.to_csv(dump_path, index=False)
         elif file_name.endswith(".parquet"):
             df.to_parquet(dump_path, index=False)
+        elif file_name.endswith(".pkl"):
+            df.to_pickle(dump_path)
 
     def dump_model(self, model: Union[BaseEstimator, Module], file_name: str) -> None:
-        """Dump the best model checkpoint to corresponding path.
+        """Dump the model checkpoint to corresponding path.
 
-        Parameters:
-            model: well-trained estimator/model
-            file_name: estimator/model name with .pkl/.pth extension
+        Support dumping for torch model and most sklearn estimator
+        instances.
 
-        Return:
-            None
+        Args:
+            model: The model checkpoint.
+            file_name: The estimator/model name with .pkl/.pth extension.
         """
         if isinstance(model, BaseEstimator):
             file_name = f"{file_name}.pkl"
         elif isinstance(model, Module):
             file_name = f"{file_name}.pth"
-        dump_path = os.path.join(self.exp_dump_path, "models", file_name)
+        dump_path = self.exp_dump_path / "models" / file_name
 
         if isinstance(model, BaseEstimator):
             with open(dump_path, "wb") as f:
@@ -171,120 +188,84 @@ class Experiment(object):
             torch.save(model.state_dict(), dump_path)
 
     def dump_trafo(self, trafo: Any, file_name: str) -> None:
-        """Dump transfomer to corresponding path.
+        """Dump data transfomer (e.g., scaler) to corresponding path.
 
-        Parameters:
-            trafo: fitted transformer
-            file_name: transformer name with .pkl extension
-
-        Return:
-            None
+        Args:
+            trafo: The fitted data transformer.
+            file_name: The transformer name with .pkl extension.
         """
         file_name = file_name if file_name.endswith(".pkl") else f"{file_name}.pkl"
-        dump_path = os.path.join(self.exp_dump_path, "trafos", file_name)
+        dump_path = self.exp_dump_path / "trafos" / file_name
         with open(dump_path, "wb") as f:
             pickle.dump(trafo, f)
 
     def set_cv_score(self, cv_score: float) -> None:
-        """Set final CV score for recording.
+        """Set the final CV score for recording.
 
-        Parameters:
-            cv_score: final CV score
-
-        Return:
-            None
+        Args:
+            cv_score: The final CV score.
         """
         self._cv_score = cv_score
 
-    def add_wnb_run(self, job_type: Optional[str] = None, name: Optional[str] = None) -> Union[Run, RunDisabled, None]:
+    def add_wnb_run(
+        self,
+        cfg: Optional[Union[DictConfig, Dict[str, Any]]] = None,
+        job_type: Optional[str] = None,
+        name: Optional[str] = None,
+    ) -> Union[Run, RunDisabled, None]:
         """Initialize an wandb run for experiment tracking.
 
-        Parameters:
-            job_type: type of run
-            name: name of run
+        Args:
+            cfg: The experiment config. Note that the current random
+                seed is recorded.
+            job_type: The job type of run.
+            name: The name of run.
 
-        Return:
-            run: wandb run to track the current experiment
+        Returns:
+            The wandb run to track the current experiment.
         """
-        run = wandb.init(project=self.args.project_name, group=self.exp_id, job_type=job_type, name=name)
+        if cfg is not None and isinstance(cfg, DictConfig):
+            cfg = dictconfig2dict(cfg)
+        run = wandb.init(project=self.cfg.project_name, config=cfg, group=self.exp_id, job_type=job_type, name=name)
 
         return run
 
-    def _parse_model_cfg(self) -> None:
-        """Configure model parameters and parameters passed to `fit`
-        method if they're provided.
+    def _log_cfg(self) -> None:
+        """Log experiment config."""
+        style = "dim"
+        tree = Tree("CFG", style=style, guide_style=style)
+        core_fields = ["project_name", "exp_id", "data", "model", "trainer"]
+        aux_fields = ["n_seeds", "seed", "use_wandb", "one_fold_only", "paths"]
+        for field in core_fields + aux_fields:
+            branch = tree.add(field, style=style, guide_style=style)
 
-        Note that "fit_params" are always ignored for DL-based models.
-        """
-        self.model_params = self.model_cfg["model_params"]
-        if self.model_cfg["fit_params"] is not None:
-            self.fit_params = self.model_cfg["fit_params"]
-        else:
-            self.fit_params = None
-
-    def _agg_cfg(self) -> None:
-        """Aggregate separate configurations into the summarized one."""
-        self.cfg = {
-            "common": vars(self.args),
-            "dp": self.dp_cfg,
-            "model": self.model_params,
-            "fit": self.fit_params,
-            "proc": self.proc_cfg,
-        }
-
-    def _evoke_cfg(self) -> None:
-        """Retrieve configuration of the pre-dumped experiment."""
-        cfg_path = os.path.join(self.exp_dump_path, "config", "cfg.yaml")
-        with open(cfg_path, "r") as f:
-            self.cfg = yaml.full_load(f)
-        self.dp_cfg = self.cfg["dp"]
-        self.model_params = self.cfg["model"]
-        self.fit_params = self.cfg["fit"]
-        self.proc_cfg = self.cfg["proc"]
-
-    def _mkbuf(self) -> None:
-        """Make local buffer for experiment output dumping."""
-        if not os.path.exists(DUMP_PATH):
-            os.mkdir(DUMP_PATH)
-        self.exp_dump_path = os.path.join(DUMP_PATH, self.exp_id)
-
-        if self.infer:
-            assert os.path.exists(self.exp_dump_path), "There exists no output objects for your specified experiment."
-        else:
-            if not os.path.exists(self.exp_dump_path):
-                os.mkdir(self.exp_dump_path)
-
-                # Create folders for output objects
-                for sub_dir in ["config", "trafos", "models", "preds", "feats", "imps"]:
-                    os.mkdir(os.path.join(self.exp_dump_path, sub_dir))
-                for pred_type in ["oof", "holdout", "final"]:
-                    os.mkdir(os.path.join(self.exp_dump_path, "preds", pred_type))
+            cfg_field = self.cfg[field]
+            if isinstance(cfg_field, DictConfig):
+                branch_content = OmegaConf.to_yaml(cfg_field, resolve=True)
             else:
-                print(f"{self.exp_dump_path} already exists!")
+                branch_content = str(cfg_field)
 
-        # Define paths for quick access
-        self.ckpt_path = os.path.join(self.exp_dump_path, "models")  # Model checkpointing
+            branch.add(Syntax(branch_content, "yaml"))
 
-    def _run(self) -> None:
-        pass
-
-    def _log_exp_metadata(self) -> None:
-        """Log metadata of the experiment to wandb."""
-        self.log(f"=====Experiment {self.exp_id}=====")
-        self.log(f"-> CFG: {self.cfg}\n")
+        # Log config to stdout and log file
+        self.log(f"===== Experiment {self.exp_id} =====")
+        rich.print(tree)
+        with open(self.exp_dump_path / self.log_file, "a") as f:
+            rich.print(tree, file=f)
 
     def _halt(self) -> None:
-        if self.args.use_wandb:
-            dump_run = self.add_wnb_run(job_type="dumping")
+        if self.cfg.use_wandb:
+            dump_entry = self.add_wnb_run(None, job_type="dumping")
 
             # Log final CV score if exists
             if self._cv_score is not None:
-                dump_run.log({"cv_score": self._cv_score})
+                dump_entry.log({"cv_score": self._cv_score})
 
-            # Push artifacts to remote
-            artif = wandb.Artifact(name=self.args.model_name.upper(), type="output")
-            artif.add_dir(self.exp_dump_path)
-            dump_run.log_artifact(artif)
-            dump_run.finish()
+            # Push artifacts to remote (Deprecated)
+            # artif = wandb.Artifact(name=self.model_name.upper(), type="output")
+            # artif.add_dir(self.exp_dump_path)
+            # dump_entry.log_artifact(artif)
 
-        self.log(f"=====End of Experiment {self.exp_id}=====")
+            dump_entry.finish()
+
+        self.log(f"===== End of Experiment {self.exp_id} =====")

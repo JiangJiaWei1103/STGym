@@ -1,9 +1,9 @@
 """
-Time series validation schemes.
+Time series cross-validation schemes.
 Author: JiaWei Jiang
 
-This file contains customized time series validators, splitting dataset
-following chronological ordering.
+This file contains definitions of time series cross-validation schemes
+which splits dataset following chronological ordering.
 """
 import math
 from typing import Iterator, Tuple
@@ -12,33 +12,26 @@ import numpy as np
 
 
 class TSSplit(object):
-    """Data splitter using the naive train/val split scheme.
+    """Time series cross-validation scheme with train/val split.
 
-    Holdout set is reserved before data splitting, so there's no split
-    for test set here.
-
-    Parameters:
-        train_ratio: ratio of training samples
-        val_ratio: ratio of validation samples
+    Args:
+        train_ratio: Ratio of training samples.
+        val_ratio: Ratio of validation samples.
     """
 
-    def __init__(self, train_ratio: float, val_ratio: float):
+    def __init__(self, train_ratio: float, val_ratio: float) -> None:
         self.train_ratio = train_ratio
         self.val_ratio = val_ratio
 
     def split(self, X: np.ndarray) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
-        """Return indices of training and validation sets.
+        """Returns indices of training and validation sets.
 
-        Because this is the implementation of naive train/val split,
-        returned Iterator is the pseudo one. That is, only a single
-        fold is considered to cater to the common experimental setting.
+        Args:
+            X: Input data.
 
-        Parameters:
-            X: input data
-
-        Yield:
-            tr_idx: training set indices for current split
-            val_idx: validation set indices for current split
+        Yields:
+            A tuple (tr_idx, val_idx), where tr_idx is the training
+            index array and val_idx is the validation index array.
         """
         n_samples = len(X)
         train_end = math.floor(n_samples * self.train_ratio)

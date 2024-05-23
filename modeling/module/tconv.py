@@ -26,7 +26,7 @@ class TConvBaseModule(nn.Module):
     def _set_receptive_field(self, n_layers: int, dilation_factor: int, kernel_size: int) -> None:
         """Calculate and set the receptive field.
 
-        Parameters:
+        Args:
             n_layers: number of stacked layers
             dilation_factor: dilation exponential base
             kernel_size: kernel size
@@ -42,10 +42,10 @@ class TConvBaseModule(nn.Module):
         """Pad the input sequence to the receptive field along the
         temporal dimension.
 
-        Parameters:
+        Args:
             x: input sequence
 
-        Return:
+        Returns:
             x_pad: padded sequence
 
         Shape:
