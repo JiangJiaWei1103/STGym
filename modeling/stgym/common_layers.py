@@ -18,39 +18,11 @@ class Linear2d(nn.Module):
     Linear2d applies linear transformation along channel dimension of
     2D planes.
     """
-    def __init__(
-        self, 
-        in_features: int, 
-        out_features: int, 
-        bias: bool = True,
-        bn: Optional[bool] = False,
-        act: Optional[str] = None, 
-        dropout: Optional[float] = None
-    ) -> None:
+    def __init__(self, in_features: int, out_features: int, bias: bool = True,) -> None:
         super(Linear2d, self).__init__()
 
         # Model blocks
         self.lin = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=(1, 1), bias=bias)
-
-        if bn:
-            self.bn = nn.BatchNorm2d(out_features)
-        else:
-            self.bn = None
-        
-        if act is not None:
-            if act == "relu":
-                self.act = nn.ReLU()
-            elif act == "tanh":
-                self.act = nn.Tanh()
-            elif act == "sigmoid":
-                self.act = nn.Sigmoid()
-        else:
-            self.act = None
-        
-        if dropout is not None:
-            self.dropout = nn.Dropout(dropout)
-        else:
-            self.dropout = None
 
     def forward(self, x: Tensor) -> Tensor:
         """Forward pass.
@@ -67,69 +39,7 @@ class Linear2d(nn.Module):
         """
         output = self.lin(x)
 
-        if self.bn is not None:
-            output = self.bn(output)
-
-        if self.act is not None:
-            output = self.act(output)
-        
-        if self.dropout is not None:
-            output = self.dropout(output)
-
         return output
-
-
-class MultiLayerPerceptron(nn.Module):
-    """Multi-Layer Perceptron."""
-    def __init__(
-        self, 
-        in_dims: List[int], 
-        h_dims: List[int],
-        acts: List[str],
-        dropouts: List[float],
-        bns: List[bool],
-        residual: bool = False
-    ):
-        super(MultiLayerPerceptron, self).__init__()
-
-        # Network parameters
-        self.residual = residual
-
-        # Model blocks
-        self.mlp_layers = nn.ModuleList()
-        for in_dim, h_dim, bn, act, dropout in zip(in_dims, h_dims, bns, acts, dropouts):
-            self.mlp_layers.append(
-                Linear2d(
-                    in_features=in_dim,
-                    out_features=h_dim,
-                    bn=bn,
-                    act=act,
-                    dropout=dropout
-                )
-            )
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Forward pass.
-
-        Parameters:
-            x: input
-
-        Return:
-            h: hidden output
-
-        Shape:
-            x: (B, in_features, N, L)
-            h: (B, out_features, N, L)
-        """
-        h = x
-        for layer in range(len(self.mlp_layers)):
-            h = self.mlp_layers[layer](h)
-
-        if self.residual:
-            h = h + x
-
-        return h
-
 
 class AuxInfoEmbeddings(nn.Module):
     """Auxiliary information embeddings."""

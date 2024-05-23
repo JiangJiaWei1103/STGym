@@ -14,7 +14,7 @@ from torch import Tensor
 
 from metadata import N_DAYS_IN_WEEK
 
-from modeling.stgym.common_layers import Linear2d, AuxInfoEmbeddings, MultiLayerPerceptron
+from modeling.stgym.common_layers import Linear2d, AuxInfoEmbeddings
 
 class STID(nn.Module):
     """STID framework.
@@ -61,14 +61,7 @@ class STID(nn.Module):
         h_dim = lin_h_dim + self.node_emb_dim + self.tid_emb_dim + self.diw_emb_dim
         self.encoder = nn.Sequential(
             *[
-                MultiLayerPerceptron(
-                    in_dims=[h_dim, h_dim],
-                    h_dims=[h_dim, h_dim],
-                    acts=["relu", None],
-                    dropouts=[0.15, None],
-                    bns=[False, False],
-                    residual=True
-                ) for _ in range(self.n_layers)
+                MultiLayerPerceptron(in_dim=h_dim, h_dim=h_dim) for _ in range(self.n_layers)
             ]
         )
         # Output layer
@@ -117,3 +110,31 @@ class STID(nn.Module):
         output = self.output(h).squeeze(-1)  # (B, Q, N)
 
         return output, None, None
+
+class MultiLayerPerceptron(nn.Module):
+    """Multi-Layer Perceptron with residual links."""
+    def __init__(self, in_dim: int, h_dim: int) -> None:
+        super(MultiLayerPerceptron, self).__init__()
+
+        self.mlp = nn.Sequential(
+            Linear2d(in_dim, h_dim),
+            nn.ReLU(),
+            nn.Dropout(p=0.15),
+            Linear2d(h_dim, h_dim)
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass.
+
+        Parameters:
+            x: input 
+            
+        Shape:
+            x: (B, in_dim, N, 1)
+            output: (B, h_dim, N, 1)
+        """
+
+        hidden = self.mlp(x)
+        output = hidden + x
+
+        return output
