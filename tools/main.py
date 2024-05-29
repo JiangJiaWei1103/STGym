@@ -133,7 +133,7 @@ def main(cfg: DictConfig) -> None:
                     train_loader=train_loader,
                     eval_loader=val_loader,
                     use_wandb=exp.cfg["use_wandb"],
-                    priori_gs=None,
+                    priori_gs=priori_gs,
                 )
 
                 # Run main training and evaluation for one fold

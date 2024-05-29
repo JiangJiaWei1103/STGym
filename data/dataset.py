@@ -49,6 +49,7 @@ class BenchmarkDataset(Dataset):
         data: processed data
         t_window: lookback time window, denoted by T
         horizon: predicting horizon, denoted by Q
+        multi_step: if True, return multi-step y
     """
 
     def __init__(
@@ -56,9 +57,11 @@ class BenchmarkDataset(Dataset):
         data: np.ndarray,
         t_window: int,
         horizon: int,
+        multi_step: bool = False,
         **kwargs: Any,
     ):
         self.data = data
+        self.multi_step = multi_step
         self.ts_attr = _TimeSeriesAttr(len(data), data.shape[1], t_window, horizon)
 
         self._chunk_X_y()
@@ -86,9 +89,14 @@ class BenchmarkDataset(Dataset):
         X = []
         y = []
 
-        for i in range(self.ts_attr.n_samples):
-            X.append(self.data[i : i + self.ts_attr.P, ...])
-            y.append(self.data[i + self.ts_attr.offset, :, 0])
+        if self.multi_step:
+            for i in range(self.ts_attr.n_samples):
+                X.append(self.data[i : i + self.ts_attr.P, ...])
+                y.append(self.data[i + self.ts_attr.P : i + self.ts_attr.offset + 1, :, 0])
+        else:
+            for i in range(self.ts_attr.n_samples):
+                X.append(self.data[i : i + self.ts_attr.P, ...])
+                y.append(self.data[i + self.ts_attr.offset, :, 0])
 
         self.X = np.stack(X)  # (M, P, N, C)
         self.y = np.stack(y)  # (M, N), Q = 1 for single-horizon
