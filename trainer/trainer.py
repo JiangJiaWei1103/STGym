@@ -9,6 +9,7 @@ inherited from `BaseTrainer`.
 * [ ] Fuse grad clipping mechanism into solver.
 """
 import gc
+import numpy as np
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -65,6 +66,7 @@ class MainTrainer(BaseTrainer):
         train_loader: DataLoader,
         eval_loader: Optional[DataLoader] = None,
         priori_gs: Optional[List[Tensor]] = None,
+        aux_data: Optional[List[np.ndarray]] = None,
         scaler: Optional[Union[MaxScaler, StandardScaler]] = None,
         use_wandb: bool = True,
     ):
@@ -83,6 +85,7 @@ class MainTrainer(BaseTrainer):
         self.train_loader = train_loader
         self.eval_loader = eval_loader if eval_loader else train_loader
         self.priori_gs = None if priori_gs is None else [A.to(self.device) for A in priori_gs]
+        self.aux_data = None if aux_data is None else [data.to(self.device) for data in aux_data]
         self.scaler = scaler
         # self.rescale = proc_cfg["loss_fn"]["rescale"]
         self.rescale = True
@@ -112,7 +115,7 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
 
             # Forward pass and derive loss
-            output, *_ = self.model(x, self.priori_gs, ycl=y, iteration=self._iter)
+            output, *_ = self.model(x, self.priori_gs, ycl=y, iteration=self._iter, aux_data=self.aux_data)
 
             # Inverse transform to the original scale
             if self.rescale:
@@ -178,7 +181,7 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
 
             # Forward pass
-            output, *_ = self.model(x, self.priori_gs)
+            output, *_ = self.model(x, self.priori_gs, ycl=y, aux_data=self.aux_data)
 
             # Derive loss
             if y.dim() == 4:

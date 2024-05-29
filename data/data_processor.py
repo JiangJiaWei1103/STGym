@@ -42,6 +42,7 @@ class DataProcessor(object):
     _data_test: np.ndarray
 
     _priori_adj_mat: Optional[List[Union[Tensor, coo_matrix, csr_matrix]]] = None
+    _aux_data: Optional[List[np.ndarray]] = None
 
     def __init__(self, **dp_cfg: Any):
         # Setup data processor
@@ -60,6 +61,7 @@ class DataProcessor(object):
         # After data splitting
         self.scaling = self.dp_cfg["scaling"]
         self.priori_gs = self.dp_cfg["priori_gs"]
+        self.aux_data_path = self.dp_cfg["aux_data_path"]
 
         # Common
         # self.n_series = N_SERIES[self.dataset_name]
@@ -145,6 +147,10 @@ class DataProcessor(object):
     def get_priori_gs(self) -> Optional[List[Tensor]]:
         """Return priori graph structure."""
         return self._priori_adj_mat
+    
+    def get_aux_data(self) -> Optional[List[np.ndarray]]:
+        """Return auxiliary data."""
+        return self._aux_data
 
     def _add_time_stamp_encoding(self, df: pd.DataFrame) -> np.ndarray:
         """Concatenate time stamp encoding to time series matrix."""
@@ -238,6 +244,30 @@ class DataProcessor(object):
             raise
 
         return adj_mat
+
+    def _load_aux_data(self) -> None:
+        """Load auxiliary data."""
+        file_path = self.aux_data_path["file_path"]
+        self._aux_data = []
+
+        for path in file_path:
+            if path.endswith("npz"):
+                self._aux_data.append(np.load(path, allow_pickle=True))
+            elif path.endswith("txt"):
+                self._aux_data.append(np.loadtxt(path, delimiter=","))
+            elif path.endswith("h5"):
+                self._aux_data.append(pd.read_hdf(path).values)
+            elif path.endswith("csv"):
+                self._aux_data.append(pd.read_csv(path).values)
+            elif path.endswith("pkl"):
+                try:
+                    with open(path, "rb") as f:
+                        self._aux_data.append(pickle.load(f))
+                except UnicodeDecodeError as e:
+                    with open(path, "rb") as f:
+                        self._aux_data.append(pickle.load(f, encoding="latin1"))
+            else:
+                raise RuntimeError(f"File type {path} isn't registered...")
 
     def _scale(
         self,
