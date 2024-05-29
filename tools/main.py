@@ -52,6 +52,7 @@ def main(cfg: DictConfig) -> None:
         dp.run_before_splitting()
         data = dp.get_data_cv()
         priori_gs = dp.get_priori_gs()
+        aux_data = dp.get_aux_data()
 
         # Run cross-validation
         cv = instantiate(exp.data_cfg["cv"])
@@ -134,6 +135,7 @@ def main(cfg: DictConfig) -> None:
                     eval_loader=val_loader,
                     use_wandb=exp.cfg["use_wandb"],
                     priori_gs=priori_gs,
+                    aux_data=aux_data
                 )
 
                 # Run main training and evaluation for one fold
