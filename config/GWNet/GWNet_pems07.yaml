@@ -5,7 +5,7 @@ model_params:
         n_layers: 8
         tcn_in_dim: 32
         gcn_in_dim: 32
-        kernel_size: 3
+        kernel_size: 2
         dilation_factor: [1, 2, 1, 2, 1, 2, 1, 2]
         n_adjs: 3
         gcn_depth: 2

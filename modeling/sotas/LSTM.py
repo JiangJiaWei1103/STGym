@@ -14,16 +14,16 @@ from torch import Tensor
 from modeling.stgym.common_layers import Linear2d
 
 class LSTM(nn.Module):
-    def __init__(self, in_dim: int, out_len: int, st_params: Dict[str, Any]) -> None:
+    def __init__(self, in_dim: int, end_dim: int, out_len: int, st_params: Dict[str, Any]) -> None:
         """LSTM framework.
 
         Parameters:
             in_dim: input feature dimension
+            end_dim: hidden dimension of output layer
             out_len: output sequence length
             n_layers: number of LSTM layers
             lin_h_dim: hidden dimension of input linear layer
             rnn_h_dim: hidden dimension of LSTM
-            end_dim: hidden dimension of output layer
             dropout: dropout ratio
         """
         self.name = self.__class__.__name__
@@ -35,7 +35,6 @@ class LSTM(nn.Module):
         lin_h_dim = st_params["lin_h_dim"]
         rnn_h_dim = st_params["rnn_h_dim"]
         rnn_dropout = st_params["rnn_dropout"]
-        end_dim = st_params["end_dim"]
         self.out_len = out_len
 
         # Model blocks

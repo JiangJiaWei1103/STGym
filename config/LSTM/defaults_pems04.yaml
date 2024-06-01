@@ -35,7 +35,7 @@ solver:
     optimizer:
         name: adam
         # Learning rate
-        lr: 0.002
+        lr: 0.001
         # Weight decay, default=1e-2 for AdamW
         weight_decay: 0.0001
         # ==Ada* series==
@@ -63,10 +63,10 @@ solver:
 
     # ==Learning rate scheduler==
     lr_skd:
-        name: multistep
-        milestones: [1, 50, 100]
+        name: null
+        milestones: null
         # Multiplicative factor of learning rate decay
-        gamma: 0.5
+        gamma: null
 
         T_max: null
         eta_min: null

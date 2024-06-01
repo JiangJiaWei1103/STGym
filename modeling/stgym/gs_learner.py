@@ -224,7 +224,7 @@ class GTSGSLearner(nn.Module):
         mask = torch.eye(self.n_series, self.n_series).bool().to(x.device)
         As.masked_fill_(mask, 0)
 
-        As = self._calculate_random_walk_matrix(As)
+        As = self._calculate_random_walk_matrix(As).t()
 
         return As
     

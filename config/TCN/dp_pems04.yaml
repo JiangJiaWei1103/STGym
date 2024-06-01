@@ -1,13 +1,13 @@
 # Configuration for data processing
 # ==Metadata==
-dataset_name: pems03
+dataset_name: pems04
 
 # ==Data Processing==
 dp:
     # Time stamp encoder
     time_enc:
       add_tid: True
-      add_diw: True
+      add_diw: False
       n_tids: 288
       max_norm: True
 
@@ -24,7 +24,7 @@ dp:
 
     # Auxiliary data
     aux_data:
-        file_path: ["./data/raw/pems03/SE_pems03.txt"]
+        file_path: null
 
 # ==CV Scheme==
 cv:

@@ -28,7 +28,7 @@ class Linear(nn.Module):
         # Network parameters
         self.st_params = st_params
         self.out_len = out_len
-        # # Spatio-temporal pattern extractor
+        # Spatio-temporal pattern extractor
         self.n_series = st_params["n_series"]
         self.individual = st_params["individual"]
         

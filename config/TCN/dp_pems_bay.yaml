@@ -1,13 +1,13 @@
 # Configuration for data processing
 # ==Metadata==
-dataset_name: pems03
+dataset_name: pems_bay
 
 # ==Data Processing==
 dp:
     # Time stamp encoder
     time_enc:
       add_tid: True
-      add_diw: True
+      add_diw: False
       n_tids: 288
       max_norm: True
 
@@ -24,14 +24,14 @@ dp:
 
     # Auxiliary data
     aux_data:
-        file_path: ["./data/raw/pems03/SE_pems03.txt"]
+        file_path: null
 
 # ==CV Scheme==
 cv:
     scheme: tssplit
     n_folds: 1
-    train_ratio: 0.75
-    val_ratio: 0.25
+    train_ratio: 0.875
+    val_ratio: 0.125
 
 # ==Dataset==
 dataset:

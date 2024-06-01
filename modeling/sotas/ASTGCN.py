@@ -46,7 +46,7 @@ class ASTGCN(nn.Module):
         # Network parameters
         self.st_params = st_params
         self.out_len = out_len
-        # hyperparameters of Spatial/Temporal Convolution Module
+        # Spatio-temporal pattern extractor
         num_block = self.st_params['num_block']
         in_channels = self.st_params['in_channels']
         self.K = self.st_params['K']

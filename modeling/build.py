@@ -14,6 +14,8 @@ from typing import Any, Dict
 from torch.nn import Module
 
 from .Final import HARDPurG
+from .sotas.LSTM import LSTM
+from .sotas.TCN import TCN
 from .sotas.DCRNN import DCRNN
 from .sotas.STGCN import STGCN
 from .sotas.GWNet import GWNet
@@ -49,6 +51,10 @@ def build_model(model_name: str, model_cfg: Dict[str, Any]) -> Module:
     model: Module
     if model_name == "HARDPurG":
         model = HARDPurG(**model_cfg)
+    elif model_name == "LSTM":
+        model = LSTM(**model_cfg)
+    elif model_name == "TCN":
+        model = TCN(**model_cfg)
     elif model_name == "DCRNN":
         model = DCRNN(**model_cfg)
     elif model_name == "STGCN":

@@ -42,6 +42,7 @@ class STNorm(nn.Module):
 
         # Network parameters
         self.st_params = st_params
+        # Spatio-temporal pattern extractor
         n_layers = st_params["n_layers"]
         tcn_in_dim = st_params["tcn_in_dim"]
         gcn_in_dim = st_params["gcn_in_dim"]

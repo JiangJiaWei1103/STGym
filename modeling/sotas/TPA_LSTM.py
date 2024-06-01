@@ -36,7 +36,7 @@ class TPA_LSTM(nn.Module):
 
         # Network parameters
         self.st_params = st_params
-        # hyperparameters of Network
+        # Spatio-temporal pattern extractor
         lin_h_dim = st_params["lin_h_dim"]
         rnn_h_dim = st_params["rnn_h_dim"]
         self.rnn_n_layers = st_params["rnn_n_layers"]

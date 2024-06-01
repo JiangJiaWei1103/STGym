@@ -80,7 +80,7 @@ solver:
 
 # ==Early Stopping==
 es:
-    patience: 100
+    patience: 20
     mode: 'min'
 
 # ==Evaluator==

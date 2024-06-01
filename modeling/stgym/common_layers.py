@@ -41,6 +41,7 @@ class Linear2d(nn.Module):
 
         return output
 
+
 class AuxInfoEmbeddings(nn.Module):
     """Auxiliary information embeddings."""
     def __init__(
@@ -120,14 +121,34 @@ class AttentionLayer(nn.Module):
         super(AttentionLayer, self).__init__()
 
         # Network parameters
+        self.bn = bn
         self.mask = mask
         self.head_dim = h_dim // n_heads
 
         # Model blocks
-        self.FC_Q = Linear2d(in_features=in_dim, out_features=h_dim, bn=bn, act=act)
-        self.FC_K = Linear2d(in_features=in_dim, out_features=h_dim, bn=bn, act=act)
-        self.FC_V = Linear2d(in_features=in_dim, out_features=h_dim, bn=bn, act=act)
-        self.output = nn.Linear(h_dim, h_dim)
+        FC_Q = [Linear2d(in_features=in_dim, out_features=h_dim)]
+        FC_K = [Linear2d(in_features=in_dim, out_features=h_dim)]
+        FC_V = [Linear2d(in_features=in_dim, out_features=h_dim)]
+        output = [Linear2d(in_features=h_dim, out_features=h_dim)]
+
+        if bn:
+            FC_Q.append(nn.BatchNorm2d(h_dim))
+            FC_K.append(nn.BatchNorm2d(h_dim))
+            FC_V.append(nn.BatchNorm2d(h_dim))
+            output.append(nn.BatchNorm2d(h_dim))
+
+        self.act = None
+        if act is not None:
+            if act == "relu":
+                FC_Q.append(nn.ReLU())
+                FC_K.append(nn.ReLU())
+                FC_V.append(nn.ReLU())
+                output.append(nn.ReLU())
+
+        self.FC_Q = nn.Sequential(*FC_Q)
+        self.FC_K = nn.Sequential(*FC_K)
+        self.FC_V = nn.Sequential(*FC_V)
+        self.output = nn.Sequential(*output)
 
     def forward(self, query: Tensor, key: Tensor, value: Tensor) -> Tensor:
         """Forward pass.
@@ -171,7 +192,100 @@ class AttentionLayer(nn.Module):
         output = attn_score @ value  # (num_heads * B, ..., tgt_length, head_dim)
         output = torch.cat(torch.split(output, batch_size, dim=0), dim=-1)  # (B, ..., tgt_length, h_dim)
 
-        output = self.output(output)
+        output = self.output(output.permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+
+        return output
+
+
+class GatedFusion(nn.Module):
+    """Gated fusion mechanism. """
+    def __init__(self, h_dim: int) -> None:
+        super(GatedFusion, self).__init__()
+
+        # Model blocks
+        self.linear_s = nn.Sequential(Linear2d(h_dim, h_dim, False), nn.BatchNorm2d(h_dim))
+        self.linear_t = nn.Sequential(Linear2d(h_dim, h_dim), nn.BatchNorm2d(h_dim))
+        self.output = nn.Sequential(
+            Linear2d(h_dim, h_dim),
+            nn.BatchNorm2d(h_dim),
+            nn.ReLU(),
+            Linear2d(h_dim, h_dim),
+            nn.BatchNorm2d(h_dim),
+        )
+
+    def forward(self, hs: Tensor, ht: Tensor) -> Tensor:
+        """Forward pass.
+
+        Parameters:
+            hs: hidden state of spatial attention
+            ht: hidden state of temporal attention
+        
+        Shape:
+            hs: (B, L, N, h_dim)
+            ht: (B, L, N, h_dim)
+            output: (B, L, N, h_dim)
+        """
+        hs = self.linear_s(hs.transpose(1, 3))          # (B, h_dim, N, L)
+        ht = self.linear_t(ht.transpose(1, 3))          # (B, h_dim, N, L)
+        z = torch.sigmoid(hs + ht)                      # (B, h_dim, N, L)
+        h = torch.mul(z, hs) + torch.mul(1 - z, ht)     # (B, h_dim, N, L)
+        output = self.output(h).transpose(1, 3)         # (B, L, N, h_dim)
+
+        return output
+
+
+class SpatioTemporalEmbedding(nn.Module):
+    """Spatial-Temporal Embedding block."""
+    def __init__(self, h_dim: int, n_tids: int) -> None:
+        super(SpatioTemporalEmbedding, self).__init__()
+
+        # Model blocks
+        self.linear_se = nn.Sequential(
+            Linear2d(h_dim, h_dim),
+            nn.BatchNorm2d(h_dim),
+            nn.ReLU(),
+            Linear2d(h_dim, h_dim),
+            nn.BatchNorm2d(h_dim)
+        )
+        self.linear_te = nn.Sequential(
+            Linear2d(n_tids + 7, h_dim),
+            nn.BatchNorm2d(h_dim),
+            nn.ReLU(),
+            Linear2d(h_dim, h_dim),
+            nn.BatchNorm2d(h_dim)
+        )
+
+    def forward(self, spatial_emb: Tensor, temporal_emb: Tensor, n_tids: int) -> Tensor:
+        """Forward pass.
+
+        Parameters:
+            spatial_emb: Spatial embedding
+            temporal_emb: Temporal embedding
+            n_tids: number of time slots in one day
+
+        Return:
+            output: Spatial-Temporal embedding
+
+        Shape:
+            spatial_emb: (N, D)
+            temporal_emb: (B, in_len + out_len, 2)
+            output: (B, in_len + out_len, N ,D)
+        """
+        batch_size, seq_len, _ = temporal_emb.shape
+        # Spatial embedding
+        spatial_emb = spatial_emb.expand(1, 1, -1, -1).transpose(1, 3)   # (1, D, N, 1)
+        spatial_emb = self.linear_se(spatial_emb).transpose(1, 3)        # (1, 1, N, D)
+        # Temporal embedding
+        diw = torch.empty(batch_size, seq_len, 7).to(temporal_emb.device)
+        tid = torch.empty(batch_size, seq_len, n_tids).to(temporal_emb.device)
+        for i in range(batch_size):
+            diw[i] = F.one_hot(temporal_emb[..., 0][i].to(torch.int64) % 7, 7)
+            tid[i] = F.one_hot(temporal_emb[..., 1][i].to(torch.int64) % n_tids, n_tids)
+        temporal_emb = torch.cat((diw, tid), dim=-1)
+        temporal_emb = temporal_emb.unsqueeze(dim=2).transpose(1, 3)  # (B, n_tids + 7, 1, in_len + out_len)
+        temporal_emb = self.linear_te(temporal_emb).transpose(1, 3)   # (B, in_len + out_len, 1, D)
+
+        output = spatial_emb + temporal_emb                           # (B, in_len + out_len, N ,D)
 
         return output
     

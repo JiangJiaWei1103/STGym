@@ -14,7 +14,7 @@ model_params:
     loss_params:
         single_step: 0
         lastWeight: 1.0
-        criterion: l1
+        criterion: null
     in_len: 12
     out_len: 12
     n_series: 170
