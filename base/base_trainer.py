@@ -74,6 +74,7 @@ class BaseTrainer:
         # If True, learning rate scheduler steps per batches
         # self.step_per_batch = proc_cfg["solver"]["lr_skd"]["step_per_batch"]
         self.step_per_batch = True
+        self.max_grad_norm = proc_cfg["max_grad_norm"]
 
         # Model checkpoint
         self.model_ckpt = ModelCheckpoint(ckpt_path, **proc_cfg["model_ckpt"])

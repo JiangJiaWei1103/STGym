@@ -6,14 +6,15 @@ Definitions of diversified trainers, whose core training logics are
 inherited from `BaseTrainer`.
 
 * [ ] Pack input data in Dict.
-* [ ] Fuse grad clipping mechanism into solver.
+* [x] Fuse grad clipping mechanism into solver.
+    * Set max_grad_norm as an attribute of `BaseTrainer`.
 """
 import gc
-import numpy as np
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import torch
 from torch import Tensor
 from torch.nn import Module
@@ -134,7 +135,7 @@ class MainTrainer(BaseTrainer):
 
             # Backpropagation
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
 
             self.optimizer.step()
             self._iter += 1

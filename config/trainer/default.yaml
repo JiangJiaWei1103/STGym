@@ -8,12 +8,13 @@
 # == Default List ==
 defaults:
     - optimizer: adam
-    - lr_skd: cos 
+    - lr_skd: cos
 
 # == Core ==
 device: "mps:0"
 epochs: 1
 grad_accum_steps: 1
+max_grad_norm: 5
 batch_scheduler: True
 use_amp: False
 # Loss criterion
