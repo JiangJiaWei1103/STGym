@@ -37,7 +37,14 @@ class MaskedLoss(_Loss):
         if np.isnan(self.masked_val):
             mask = ~torch.isnan(y_true)
         else:
-            mask = y_true != self.masked_val
+            eps = 5e-5
+            mask = ~torch.isclose(
+                y_true, 
+                torch.tensor(self.masked_val).expand_as(y_true).to(y_true.device), 
+                atol=eps, 
+                rtol=0.
+            )
+            # mask = y_true != self.masked_val
 
         mask = mask.float()
         mask /= torch.mean(mask)  # Adjust non-masked entry weights
