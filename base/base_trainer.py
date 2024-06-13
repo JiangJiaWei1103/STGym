@@ -71,9 +71,7 @@ class BaseTrainer:
 
         self.device = proc_cfg["device"]
         self.epochs = proc_cfg["epochs"]
-        # If True, learning rate scheduler steps per batches
-        # self.step_per_batch = proc_cfg["solver"]["lr_skd"]["step_per_batch"]
-        self.step_per_batch = True
+        self.batch_scheduler = proc_cfg["batch_scheduler"]
         self.max_grad_norm = proc_cfg["max_grad_norm"]
 
         # Model checkpoint
@@ -99,7 +97,7 @@ class BaseTrainer:
             val_loss, val_result, _ = self._eval_epoch(datatype="val")
 
             # Adjust learning rate
-            if not self.step_per_batch and self.lr_skd is not None:
+            if not self.batch_scheduler and self.lr_skd is not None:
                 if isinstance(self.lr_skd, lr_scheduler.ReduceLROnPlateau):
                     self.lr_skd.step(val_loss)
                 else:

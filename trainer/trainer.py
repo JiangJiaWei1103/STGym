@@ -141,7 +141,7 @@ class MainTrainer(BaseTrainer):
             self._iter += 1
             train_loss_total += loss.item()
 
-            if self.step_per_batch:
+            if self.batch_scheduler:
                 self.lr_skd.step()
 
             # Free mem.
