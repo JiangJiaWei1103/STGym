@@ -102,7 +102,9 @@ def main(cfg: DictConfig) -> None:
                 optimizer = opt_partial(params=model.parameters())
                 # LR scheduler
                 lr_skd_partial = instantiate(exp.trainer_cfg["lr_skd"])
-                if HydraConfig.get().runtime.choices["trainer/lr_skd"] == "cos":
+                if lr_skd_partial is None:
+                    lr_skd = None
+                elif HydraConfig.get().runtime.choices["trainer/lr_skd"] == "cos":
                     num_training_steps = (
                         math.ceil(
                             len(train_loader.dataset)
@@ -135,7 +137,7 @@ def main(cfg: DictConfig) -> None:
                     eval_loader=val_loader,
                     use_wandb=exp.cfg["use_wandb"],
                     priori_gs=priori_gs,
-                    aux_data=aux_data
+                    aux_data=aux_data,
                 )
 
                 # Run main training and evaluation for one fold
