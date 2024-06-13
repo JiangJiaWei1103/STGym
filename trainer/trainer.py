@@ -89,15 +89,14 @@ class MainTrainer(BaseTrainer):
         self.priori_gs = None if priori_gs is None else [A.to(self.device) for A in priori_gs]
         self.aux_data = None if aux_data is None else [data.to(self.device) for data in aux_data]
         self.scaler = scaler
-        # self.rescale = proc_cfg["loss_fn"]["rescale"]
-        self.rescale = True
+        self.rescale = proc_cfg["rescale"]
+        self.custom_loss = proc_cfg["custom_loss"]
 
         # Curriculum learning
-        # if self.proc_cfg["loss_fn"]["cl"] is not None:
-        #     self._cl = CLTracker(**self.proc_cfg["loss_fn"]["cl"])
-        # else:
-        #     self._cl = None
-        self._cl = None
+        if self.proc_cfg["cl"] is not None:
+            self._cl = CLTracker(**self.proc_cfg["cl"])
+        else:
+            self._cl = None
 
         # Mixed precision training
         self.grad_scaler = GradScaler(enabled=self.use_amp)
@@ -131,12 +130,7 @@ class MainTrainer(BaseTrainer):
                 # Derive loss
                 if y.dim() == 4:
                     y = y[..., 0]
-                if self._cl is not None:
-                    task_lv = self._cl.get_task_lv()
-                    loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
-                    self._cl.step()
-                else:
-                    loss = self.loss_fn(output, y)
+                loss = self._get_train_loss(output, y, _)
 
             # Backpropagation
             self.grad_scaler.scale(loss).backward()
@@ -195,13 +189,7 @@ class MainTrainer(BaseTrainer):
             # Derive loss
             if y.dim() == 4:
                 y = y[..., 0]
-            if self.rescale:
-                loss = self.loss_fn(
-                    self.scaler.inverse_transform(output),
-                    self.scaler.inverse_transform(y),
-                )
-            else:
-                loss = self.loss_fn(output, y)
+            loss, output, y = self._get_eval_loss(output, y, _)
             eval_loss_total += loss.item()
 
             # Record batched output
@@ -226,6 +214,44 @@ class MainTrainer(BaseTrainer):
             return eval_loss_avg, eval_result, y_pred
         else:
             return eval_loss_avg, eval_result, None
+    
+    def _get_train_loss(self, output: Tensor, y: Tensor, mid_output: List[Tensor]) -> float:
+        """Get training loss.
+
+        Returns:
+            loss: training loss
+        """
+        if self.custom_loss:
+            loss = self.model.train_loss(output, y, mid_output, self.scaler, self.loss_fn)
+        elif self._cl is not None:
+            task_lv = self._cl.get_task_lv()
+            loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
+            self._cl.step()
+        else:
+            loss = self.loss_fn(output, y)
+
+        return loss
+    
+    def _get_eval_loss(self, output: Tensor, y: Tensor, mid_output: List[Tensor]) -> Tuple[float, Tensor, Tensor]:
+        """Get evaluation loss.
+
+        Returns:
+            loss: evaluation loss
+            output: inference result
+            y: ground truth
+
+        """
+        if self.custom_loss:
+            loss, output, y = self.model.eval_loss(output, y, mid_output, self.scaler, self.loss_fn)
+        elif self.rescale:
+            loss = self.loss_fn(
+                self.scaler.inverse_transform(output),
+                self.scaler.inverse_transform(y),
+            )
+        else:
+            loss = self.loss_fn(output, y)
+
+        return loss, output, y
 
 
 class CLTracker(object):
