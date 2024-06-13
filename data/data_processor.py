@@ -18,7 +18,7 @@ from pandas.api.types import is_datetime64_any_dtype
 from scipy.sparse import coo_matrix, csr_matrix
 from torch import Tensor
 
-from metadata import N_DAYS_IN_WEEK
+from metadata import N_DAYS_IN_WEEK, N_SERIES, MTSFBerks, TrafBerks
 from utils.common import asym_norm, calculate_random_walk_matrix, calculate_scaled_laplacian, sym_norm
 from utils.scaler import MaxScaler, MinMaxScaler, StandardScaler
 
@@ -55,6 +55,7 @@ class DataProcessor(object):
     def _setup(self) -> None:
         """Retrieve hyperparameters for data processing."""
         # Before data splitting
+        self.data_path = self.dp_cfg["data_path"]
         self.holdout_ratio = self.dp_cfg["holdout_ratio"]
         self.time_enc_params = self.dp_cfg["time_enc"]
 
@@ -64,7 +65,8 @@ class DataProcessor(object):
         self.aux_data_path = self.dp_cfg["aux_data_path"]
 
         # Common
-        # self.n_series = N_SERIES[self.dataset_name]
+        self.dataset_name = self.dp_cfg["dataset_name"]
+        self.n_series = N_SERIES[self.dataset_name]
 
     def _load_data(self) -> None:
         """Load raw data."""
@@ -72,21 +74,18 @@ class DataProcessor(object):
         # ===
         # Parse self.data_path and load data...
         # ===
-        data_path = self.dp_cfg["data_path"]
-        data_vals = np.load(data_path, allow_pickle=True)["data"][..., 0]
-        self._df = pd.DataFrame(data_vals)
-        # if self.dataset_name in MTSFBerks:
-        #     data_vals = np.loadtxt(self.file_path, delimiter=",")
-        #     self._df = pd.DataFrame(data_vals)
-        # elif self.dataset_name in TrafBerks:
-        #     if self.file_path.endswith("npz"):
-        #         data_vals = np.load(self.file_path, allow_pickle=True)["data"][..., 0]
-        #         self._df = pd.DataFrame(data_vals)
-        #     else:
-        #         self._df = pd.read_hdf(self.file_path)
+        if self.dataset_name in MTSFBerks:
+            data_vals = np.loadtxt(self.data_path, delimiter=",")
+            self._df = pd.DataFrame(data_vals)
+        elif self.dataset_name in TrafBerks:
+            if self.data_path.endswith("npz"):
+                data_vals = np.load(self.data_path, allow_pickle=True)["data"][..., 0]
+                self._df = pd.DataFrame(data_vals)
+            else:
+                self._df = pd.read_hdf(self.data_path)
 
         logging.info(f"\t>> Data shape: {self._df.shape}")
-        # assert self._df.shape[1] == self.n_series, "#Series doesn't match."
+        assert self._df.shape[1] == self.n_series, "#Series doesn't match."
 
     def run_before_splitting(self) -> None:
         """Clean and process data before data splitting (i.e., on raw
@@ -183,11 +182,10 @@ class DataProcessor(object):
         priori_gs_type = self.priori_gs["type"]
 
         if priori_gs_type == "identity":
-            # self._priori_adj_mat = [torch.eye(self.n_series)]
-            self._priori_adj_mat = torch.eye(1)
+            self._priori_adj_mat = [torch.eye(self.n_series)]
         else:
             adj_mat = self._load_adj_mat()
-            # assert self.n_series == adj_mat.shape[0], "Shape of the adjacency matrix is wrong."
+            assert self.n_series == adj_mat.shape[0], "Shape of the adjacency matrix is wrong."
 
             if priori_gs_type == "sym_norm":
                 self._priori_adj_mat = [sym_norm(adj_mat)]
@@ -215,7 +213,10 @@ class DataProcessor(object):
             v = torch.FloatTensor(L.data)
             return torch.sparse.FloatTensor(i, v, torch.Size(shape))
 
-        self._priori_adj_mat = [_build_sparse_matrix(A) for A in self._priori_adj_mat]
+        if priori_gs_type in ["random_walk", "dual_random_walk"]:
+            self._priori_adj_mat = [_build_sparse_matrix(A) for A in self._priori_adj_mat]
+        if priori_gs_type in ["laplacian", "binary_laplacian"]:
+            self._priori_adj_mat = [torch.tensor(A.todense()) for A in self._priori_adj_mat]
         # ===
 
     def _load_adj_mat(self) -> np.ndarray:
@@ -228,8 +229,7 @@ class DataProcessor(object):
         """
         # ===
         # Parse adj path and load
-        # adj_mat_file_path = os.path.join(RAW_DATA_PATH, self.dataset_name, f"{self.dataset_name}_adj.pkl")
-        adj_mat_file_path = ""
+        adj_mat_file_path = self.dp_cfg["adj_path"]
         # ===
 
         try:
