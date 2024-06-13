@@ -11,23 +11,21 @@ defaults:
     - lr_skd: cos
 
 # == Core ==
-device: "mps:0"
-epochs: 1
+device: "cuda:0"
+epochs: 100
+cl:
+    lv_up_period: 2500
+    task_lv_max: 12
+custom_loss: False
 grad_accum_steps: 1
 max_grad_norm: 5
-batch_scheduler: True
+rescale: True
+batch_scheduler: False
 use_amp: False
 # Loss criterion
 loss_fn:
     _target_: criterion.custom.MaskedLoss
     name: l1
-    # ===
-    # Refactor custom ops
-    # rescale: True
-    # cl:
-    #     lv_up_period: 2500
-    #     task_lv_max: 12
-    # ===
 # Dataloader
 dataloader:
     batch_size: 64
@@ -56,7 +54,7 @@ es:
 model_ckpt:
     ckpt_metric: null
     ckpt_mode: min
-    best_ckpt_mid: last
+    best_ckpt_mid: loss
 
 # == Debug ==
 # If True, `_train_stop` stops after one batch, which is useful for

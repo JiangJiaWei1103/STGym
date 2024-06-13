@@ -144,15 +144,12 @@ def main(cfg: DictConfig) -> None:
                 trainer.train_eval(proc_id)
 
                 # Run evaluation on unseen test set
-                if False:
-                    # ===
-                    # Recover test...
+                if exp.cfg["eval_on_test"]:
                     data_test = dp.get_data_test()
                     test_loader = build_dataloader(
                         data_test, "test", exp.data_cfg["dataset"], **exp.trainer_cfg["dataloader"]
                     )
                     _ = trainer.test(fold, test_loader)
-                    # ===
 
                 # Dump output objects
                 if scaler is not None:
