@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import torch
 from torch import Tensor
+from torch.cuda.amp import GradScaler, autocast
 from torch.nn import Module
 from torch.nn.modules.loss import _Loss
 from torch.optim import Optimizer, lr_scheduler
@@ -98,6 +99,9 @@ class MainTrainer(BaseTrainer):
         #     self._cl = None
         self._cl = None
 
+        # Mixed precision training
+        self.grad_scaler = GradScaler(enabled=self.use_amp)
+
     def _train_epoch(self) -> float:
         """Run training process for one epoch.
 
@@ -116,28 +120,32 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
 
             # Forward pass and derive loss
-            output, *_ = self.model(x, self.priori_gs, ycl=y, iteration=self._iter, aux_data=self.aux_data)
+            with autocast(enabled=self.use_amp):
+                output, *_ = self.model(x, self.priori_gs, ycl=y, iteration=self._iter, aux_data=self.aux_data)
 
-            # Inverse transform to the original scale
-            if self.rescale:
-                output = self.scaler.inverse_transform(output)
-                y = self.scaler.inverse_transform(y)
+                # Inverse transform to the original scale
+                if self.rescale:
+                    output = self.scaler.inverse_transform(output)
+                    y = self.scaler.inverse_transform(y)
 
-            # Derive loss
-            if y.dim() == 4:
-                y = y[..., 0]
-            if self._cl is not None:
-                task_lv = self._cl.get_task_lv()
-                loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
-                self._cl.step()
-            else:
-                loss = self.loss_fn(output, y)
+                # Derive loss
+                if y.dim() == 4:
+                    y = y[..., 0]
+                if self._cl is not None:
+                    task_lv = self._cl.get_task_lv()
+                    loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
+                    self._cl.step()
+                else:
+                    loss = self.loss_fn(output, y)
 
             # Backpropagation
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+            self.grad_scaler.scale(loss).backward()
+            if self.max_grad_norm is not None:
+                self.grad_scaler.unscale_(self.optimizer)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+            self.grad_scaler.step(self.optimizer)  # Auto unscale
+            self.grad_scaler.update()
 
-            self.optimizer.step()
             self._iter += 1
             train_loss_total += loss.item()
 

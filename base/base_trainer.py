@@ -73,6 +73,7 @@ class BaseTrainer:
         self.epochs = proc_cfg["epochs"]
         self.batch_scheduler = proc_cfg["batch_scheduler"]
         self.max_grad_norm = proc_cfg["max_grad_norm"]
+        self.use_amp = proc_cfg["use_amp"]
 
         # Model checkpoint
         self.model_ckpt = ModelCheckpoint(ckpt_path, **proc_cfg["model_ckpt"])
