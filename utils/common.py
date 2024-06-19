@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Dict, List
 
 import numpy as np
-import scipy as sp
+import scipy.sparse as sp
 import torch
 import wandb
 from omegaconf import DictConfig, OmegaConf
