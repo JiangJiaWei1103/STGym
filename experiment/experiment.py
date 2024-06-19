@@ -235,7 +235,7 @@ class Experiment(object):
         style = "dim"
         tree = Tree("CFG", style=style, guide_style=style)
         core_fields = ["project_name", "exp_id", "data", "model", "trainer"]
-        aux_fields = ["n_seeds", "seed", "use_wandb", "one_fold_only", "paths"]
+        aux_fields = ["n_seeds", "seed", "use_wandb", "one_fold_only", "eval_on_test", "paths"]
         for field in core_fields + aux_fields:
             branch = tree.add(field, style=style, guide_style=style)
 
