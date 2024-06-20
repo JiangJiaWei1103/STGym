@@ -1,0 +1,19 @@
+# model/DCRNN
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.DCRNN.DCRNN
+    # Spatial/Temporal pattern extractor
+    st_params:
+        n_layers: 2
+        enc_in_dim: 2
+        dec_in_dim: 1
+        h_dim: 64
+        out_dim: 1
+        n_adjs: 2
+        max_diffusion_step: 2
+        use_curriculum_learning: True
+        cl_decay_steps: 2000
+    out_len: 12
+
+fit_params:

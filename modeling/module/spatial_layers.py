@@ -1,21 +1,22 @@
 """
-Sub-layers.
-Author: JiaWei Jiang
+Spatial-layers.
+Author: JiaWei Jiang, ChunWei Shen
 """
 from typing import List, Optional, Type, Union
 
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
+from .common_layers import Linear2d, Align
 
-# Spatial pattern extractor
 class DiffusionConvLayer(nn.Module):
     """Diffusion convolutional layer."""
 
     def __init__(
-        self, in_dim: int, h_dim: int, n_adjs: int = 2, max_diffusion_step: int = 2, act: Optional[str] = None
+        self, in_dim: int, h_dim: int, n_adjs: int = 2, max_diffusion_step: int = 2
     ) -> None:
         super(DiffusionConvLayer, self).__init__()
 
@@ -26,13 +27,6 @@ class DiffusionConvLayer(nn.Module):
 
         # Model blocks
         self.conv_filter = nn.Linear(in_dim * self.n_node_embs, h_dim)
-        if act is not None:
-            if act == "relu":
-                self.act = nn.ReLU()
-            elif act == "sigmoid":
-                self.act = nn.Sigmoid()
-        else:
-            self.act = None
 
         self._reset_parameters()
 
@@ -63,10 +57,11 @@ class DiffusionConvLayer(nn.Module):
         for A in As:
             for k in range(1, self.max_diffusion_step + 1):
                 if k == 1:
-                    x_conv = torch.einsum("bvc,vw->bwc", (x, A))
+                    x_conv = torch.mm(A, x)
                 else:
-                    x_conv = 2 * torch.einsum("bvc,vw->bwc", (x_conv, A)) - x  # Purpose?
-                    x = x_conv
+                    tmp = x_conv
+                    x_conv = 2 * torch.mm(A, x_conv) - x
+                    x = tmp
                 x_convs = torch.cat([x_convs, x_conv.unsqueeze(0)], dim=0)
 
         x = x_convs.reshape(self.n_node_embs, n_series, self.in_dim, batch_size)
@@ -74,6 +69,71 @@ class DiffusionConvLayer(nn.Module):
         x = x.reshape(batch_size * n_series, -1)
         h = self.conv_filter(x).reshape(batch_size, n_series, -1)  # (B, N, h_dim)
 
+        return h
+
+
+class ChebGraphConv(nn.Module):
+    """Chebyshev graph convolution."""
+
+    def __init__(self, in_dim: int, h_dim: int, cheb_k: int, bias: bool = True) -> None:
+        super(ChebGraphConv, self).__init__()
+
+        # Network parameters
+        self.in_dim = in_dim
+        self.h_dim = h_dim
+        self.cheb_k = cheb_k
+
+        # Model blocks
+        self.align = Align(in_dim, h_dim)
+        self.gconv = GCN2d(flow="tgt_to_src")
+        self.weight = nn.Parameter(torch.FloatTensor(cheb_k, h_dim, h_dim))
+        self.bias = nn.Parameter(torch.FloatTensor(h_dim)) if bias else None
+
+        self._reset_parameters()
+
+    def _reset_parameters(self) -> None:
+        nn.init.kaiming_uniform_(self.weight, a = math.sqrt(5))
+        if self.bias is not None:
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.weight)
+            bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+            nn.init.uniform_(self.bias, -bound, bound)
+    
+    def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input node features
+            As: list of adjacency matrices
+
+        Returns:
+            h: chebyshev graph convolution output
+        
+        Shape:
+            x: (B, C, N, L)
+            h: (B, C', N, L)
+        """
+        x_resid = self.align(x)
+        x = x_resid.permute(0, 3, 2, 1)    # (B, L, N, C)
+
+        x_convs = [x]
+        x_conv = x
+        for i in range(1, self.cheb_k):
+            if i == 1:
+                x_conv = self.gconv(x_conv, As[0])
+            else:
+                tmp = x_conv
+                x_conv = self.gconv(x_conv, As[0]) - x
+                x = tmp
+            x_convs.append(x_conv)
+        
+        x = torch.stack(x_convs, dim=2)
+        
+        h = torch.einsum('btkhi,kij->bthj', x, self.weight)     # (B, L, N, C')
+        if self.bias is not None:
+            h = torch.add(h, self.bias).permute(0, 3, 2, 1)     # (B, C', N, L)
+
+        h = h + x_resid
+        
         return h
 
 
@@ -85,7 +145,7 @@ class InfoPropLayer(nn.Module):
             {"src_to_tgt", "tgt_to_src"}
         mix_prop: if True, mix-hop propagation in MTGNN is used
     """
-
+    
     def __init__(
         self,
         in_dim: int,
@@ -119,7 +179,7 @@ class InfoPropLayer(nn.Module):
     def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
         """Forward pass.
 
-        Parametersi:
+        Args:
             x: input node features
             As: list of adjacency matrices
 
@@ -151,6 +211,62 @@ class InfoPropLayer(nn.Module):
             h = self.dropout(h)
 
         return h
+
+
+class STSGCM(nn.Module):
+    """Spatial-Temporal Synchronous Graph Convolutional Module."""
+
+    def __init__(self, in_dim: int, h_dim: int, gcn_depth: int, n_series: int, act: str) -> None:
+        super(STSGCM,self).__init__()
+
+        # Network parameters
+        self.gcn_depth = gcn_depth
+        self.n_series = n_series
+        self.act = act
+
+        # Model blocks
+        self.gconv = GCN2d(flow="tgt_to_src")
+        self.conv_filter = nn.ModuleList()
+        for i in range(gcn_depth):
+            in_dim = in_dim if i == 0 else h_dim
+            if act == "glu":
+                self.conv_filter.append(Linear2d(in_features=in_dim, out_features=2 * h_dim))
+            elif act == "relu":
+                self.conv_filter.append(Linear2d(in_features=in_dim, out_features=h_dim))
+
+    def forward(self, x: Tensor, A: Tensor) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+            A: adjacency matrix
+
+        Shape:
+            x: (3N, B, C)
+            A: (3N, 3N)
+            output: (N, B, C')
+        """
+        x = x.permute(1, 2, 0)     # (B, C, 3N)
+        x_convs = []
+
+        for i in range(self.gcn_depth):
+            x = x.unsqueeze(-1)             # (B, C, 3N, 1)
+            x = self.gconv(x, A)            # (B, C, 3N, 1)
+            x = self.conv_filter[i](x)      # (B, 2C', 3N, 1) or (B, C', 3N, 1)
+            if self.act == "glu":
+                lhs, rhs = torch.split(x, x.shape[1] // 2, dim=1)    # (B, C', 3N, 1), (B, C', 3N, 1)
+                x = lhs * torch.sigmoid(rhs)                         # (B, C', 3N, 1)
+                x = x.squeeze(dim=-1)                                # (B, C', 3N)
+            elif self.act == "relu":
+                x = F.relu(x.squeeze(dim=-1))                        # (B, C', 3N)
+            x_convs.append(x.permute(2, 0, 1))
+        
+        # Aggregating operation and Cropping operation
+        x_convs = [conv[(self.n_series):(2 * self.n_series), :, :].unsqueeze(0) for conv in x_convs] # (1, N, B, C')
+        output = torch.cat(x_convs, dim=0)          # (gcn_depth, N, B, C')
+        output = torch.max(output, dim=0).values    # (N, B, C')
+
+        return output
 
 
 class GCN2d(nn.Module):
@@ -212,145 +328,3 @@ class GCN2d(nn.Module):
             A = A.T
 
         return A
-
-
-# Temporal pattern extractor
-class GatedTCN(nn.Module):
-    """Gated temporal convolution layer.
-
-    Args:
-        conv_module: customized convolution module
-    """
-
-    def __init__(
-        self,
-        in_dim: int,
-        h_dim: int,
-        kernel_size: Union[int, List[int]],
-        dilation_factor: int,
-        dropout: Optional[float] = None,
-        conv_module: Optional[Type[nn.Module]] = None,
-    ) -> None:
-        super(GatedTCN, self).__init__()
-
-        # Model blocks
-        if conv_module is None:
-            self.filter = nn.Conv2d(
-                in_channels=in_dim, out_channels=h_dim, kernel_size=(1, kernel_size), dilation=dilation_factor
-            )
-            self.gate = nn.Conv2d(
-                in_channels=in_dim, out_channels=h_dim, kernel_size=(1, kernel_size), dilation=dilation_factor
-            )
-        else:
-            self.filter = conv_module(
-                in_channels=in_dim, out_channels=h_dim, kernel_size=kernel_size, dilation=dilation_factor
-            )
-            self.gate = conv_module(
-                in_channels=in_dim, out_channels=h_dim, kernel_size=kernel_size, dilation=dilation_factor
-            )
-
-        if dropout is not None:
-            self.dropout = nn.Dropout(dropout)
-        else:
-            self.dropout = None
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Forward pass.
-
-        Args:
-            x: input sequence
-
-        Returns:
-            h: output sequence
-
-        Shape:
-            x: (B, C, N, L), where L denotes the input sequence length
-            h: (B, h_dim, N, L')
-        """
-        x_filter = F.tanh(self.filter(x))
-        x_gate = F.sigmoid(self.gate(x))
-        h = x_filter * x_gate
-        if self.dropout is not None:
-            h = self.dropout(h)
-
-        return h
-
-
-class DilatedInception(nn.Module):
-    """Dilated inception layer.
-
-    Note that `out_channels` will be split across #kernels.
-    """
-
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: List[int], dilation: int) -> None:
-        super(DilatedInception, self).__init__()
-
-        # Network parameters
-        n_kernels = len(kernel_size)
-        assert out_channels % n_kernels == 0, "out_channels must be divisible by #kernels."
-        h_dim = out_channels // n_kernels
-
-        # Model blocks
-        self.convs = nn.ModuleList()
-        for k in kernel_size:
-            self.convs.append(
-                nn.Conv2d(in_channels=in_channels, out_channels=h_dim, kernel_size=(1, k), dilation=dilation)
-            )
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Forward pass.
-
-        Args:
-            x: input sequence
-
-        Returns:
-            h: output sequence
-
-        Shape:
-            x: (B, C, N, L)
-            h: (B, out_channels, N, L')
-        """
-        x_convs = []
-        for conv in self.convs:
-            x_conv = conv(x)
-            x_convs.append(x_conv)
-
-        # Truncate according to the largest filter
-        out_len = x_convs[-1].shape[-1]
-        for i, x_conv in enumerate(x_convs):
-            x_convs[i] = x_conv[..., -out_len:]
-        h = torch.cat(x_convs, dim=1)
-
-        return h
-
-
-# Common
-class Linear2d(nn.Module):
-    """Linear layer over 2D plane.
-
-    Linear2d applies linear transformation along channel dimension of
-    2D planes.
-    """
-
-    def __init__(self, in_features: int, out_features: int, bias: bool = True) -> None:
-        super(Linear2d, self).__init__()
-
-        # Model blocks
-        self.lin = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=(1, 1), bias=bias)
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Forward pass.
-
-        Args:
-            x: input
-
-        Returns:
-            output: output
-
-        Shape:
-            x: (B, in_features, H, W)
-            output: (B, out_features, H, W)
-        """
-        output = self.lin(x)
-
-        return output

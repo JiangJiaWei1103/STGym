@@ -1,0 +1,7 @@
+# trainer/lr_skd/multistep
+_target_: torch.optim.lr_scheduler.MultiStepLR
+_partial_: True
+milestones:
+    - 1
+    - 50
+gamma: 0.5

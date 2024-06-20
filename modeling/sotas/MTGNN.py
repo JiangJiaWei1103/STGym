@@ -1,6 +1,6 @@
 """
 Baseline method, MTGNN [KDD, 2020].
-Author: JiaWei Jiang
+Author: JiaWei Jiang, ChunWei Shen
 
 Reference:
 * Paper: https://arxiv.org/abs/2005.11650
@@ -13,9 +13,9 @@ import torch.nn as nn
 from torch import Tensor
 
 from modeling.module.tconv import TConvBaseModule
-from modeling.sotas.gs_learner import MTGNNGSLearner
-from modeling.sotas.layers import MTGNNLayer
-from modeling.sotas.sub_layers import Linear2d
+from modeling.module.gs_learner import MTGNNGSLearner
+from modeling.module.layers import MTGNNLayer
+from modeling.module.common_layers import Linear2d
 
 
 class MTGNN(TConvBaseModule):
@@ -67,11 +67,11 @@ class MTGNN(TConvBaseModule):
         gcn_in_dim = st_params["gcn_in_dim"]
         kernel_size = st_params["kernel_size"]
         dilation_exponential = st_params["dilation_exponential"]
-        n_adjs = st_params["n_adjs"]
         gcn_depth = st_params["gcn_depth"]
         beta = st_params["beta"]
         dropout = st_params["dropout"]
         ln_affine = st_params["ln_affine"]
+        self.in_len = in_len
         out_dim = out_len
         # Receptive field and sequence length
         self._set_receptive_field(n_layers, dilation_exponential, kernel_size[-1])
@@ -86,7 +86,7 @@ class MTGNN(TConvBaseModule):
         self.node_idx = torch.arange(n_series)
         # Stacked spatio-temporal layers
         self.in_skip = nn.Sequential(
-            nn.Dropout(dropout), nn.Conv2d(in_channels=tcn_in_dim, out_channels=skip_dim, kernel_size=(1, in_len))
+            nn.Dropout(dropout), nn.Conv2d(in_channels=in_dim, out_channels=skip_dim, kernel_size=(1, in_len))
         )
         self.mtgnn_layers = nn.ModuleList()
         self.skip_convs = nn.ModuleList()
@@ -101,7 +101,6 @@ class MTGNN(TConvBaseModule):
                     kernel_size=kernel_size,
                     dilation_exponential=dilation_exponential,
                     tcn_dropout=dropout,
-                    n_adjs=n_adjs,
                     gcn_depth=gcn_depth,
                     beta=beta,
                     ln_affine=ln_affine,
@@ -110,16 +109,10 @@ class MTGNN(TConvBaseModule):
 
             layer_out_len = self.mtgnn_layers[layer].out_len
             self.skip_convs.append(
-                nn.Sequential(
-                    nn.Dropout(dropout),
-                    nn.Conv2d(in_channels=gcn_in_dim, out_channels=skip_dim, kernel_size=(1, layer_out_len)),
-                )
+                nn.Conv2d(in_channels=gcn_in_dim, out_channels=skip_dim, kernel_size=(1, layer_out_len))
             )
-        self.out_skip = nn.Sequential(
-            nn.Dropout(dropout),
-            nn.Conv2d(
-                in_channels=gcn_in_dim, out_channels=skip_dim, kernel_size=(1, in_len - self.receptive_field + 1)
-            ),
+        self.out_skip = nn.Conv2d(
+            in_channels=gcn_in_dim, out_channels=skip_dim, kernel_size=(1, in_len - self.receptive_field + 1)
         )
         # Output layer
         self.output = nn.Sequential(nn.ReLU(), Linear2d(skip_dim, end_dim), nn.ReLU(), Linear2d(end_dim, out_dim))
@@ -137,11 +130,12 @@ class MTGNN(TConvBaseModule):
         Shape:
             x: (B, P, N, C)
             As: each A with shape (N, N)
+            output: (B, Q, N)
         """
         # Input linear layer
         x = x.permute(0, 3, 2, 1)  # (B, C, N, P)
-        x = self._pad_seq_to_rf(x)
-        x = self.in_lin(x)  # (B, tcn_in_dm, N, P)
+        if self.in_len < self.receptive_field:
+            x = self._pad_seq_to_rf(x)
 
         # Self-adaptive adjacency matrix
         if self.node_idx.device != x.device:
@@ -150,6 +144,7 @@ class MTGNN(TConvBaseModule):
 
         # Stacked spatio-temporal layers
         x_skip = self.in_skip(x)
+        x = self.in_lin(x)  # (B, tcn_in_dm, N, P)
         for layer, mtgnn_layer in enumerate(self.mtgnn_layers):
             # Capture inflow and outflow patterns
             h_tcn, x = mtgnn_layer(x, [A_adp, A_adp.T])

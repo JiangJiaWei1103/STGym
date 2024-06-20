@@ -13,9 +13,7 @@ defaults:
 # == Core ==
 device: "cuda:0"
 epochs: 100
-cl:
-    lv_up_period: 2500
-    task_lv_max: 12
+cl: null
 custom_loss: False
 grad_accum_steps: 1
 max_grad_norm: 5
@@ -49,7 +47,7 @@ evaluator:
 # Early stopping
 es:
     patience: 0
-    mode: null
+    mode: min
 # Model checkpoint
 model_ckpt:
     ckpt_metric: null

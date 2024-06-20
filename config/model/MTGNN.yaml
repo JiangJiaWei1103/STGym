@@ -1,0 +1,29 @@
+# model/MTGNN
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.MTGNN.MTGNN
+    # Graph Learning Layer
+    gsl_params:
+        n_series: 207
+        node_emb_dim: 40
+        alpha: 3
+        k: 20
+    # Spatial-Temporal pattern extractor
+    st_params:
+        n_layers: 3
+        tcn_in_dim: 32
+        gcn_in_dim: 32
+        kernel_size: [2, 3, 6, 7]
+        dilation_exponential: 1
+        gcn_depth: 2
+        beta: 0.05
+        dropout: 0.3
+        ln_affine: True 
+    in_dim: 2
+    skip_dim: 64
+    end_dim: 128
+    in_len: 12
+    out_len: 12
+
+fit_params:

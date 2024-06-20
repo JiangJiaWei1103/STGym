@@ -1,6 +1,6 @@
 """
 Baseline method, DCRNN [ICLR, 2018].
-Author: JiaWei Jiang
+Author: JiaWei Jiang, ChunWei Shen
 
 Reference:
 * Paper: https://arxiv.org/abs/1707.01926
@@ -9,14 +9,14 @@ Reference:
     * https://github.com/xlwang233/pytorch-DCRNN
 """
 import random
+import numpy as np
 from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
 
-from modeling.sotas.layers import DCGRU
+from modeling.module.layers import DCGRU
 
 
 class DCRNN(nn.Module):
@@ -62,7 +62,6 @@ class DCRNN(nn.Module):
             n_layers=n_layers,
             n_adjs=n_adjs,
             max_diffusion_step=max_diffusion_step,
-            act=None,
         )
         # Decoder
         self.decoder = _Decoder(
@@ -73,11 +72,15 @@ class DCRNN(nn.Module):
             n_layers=n_layers,
             n_adjs=n_adjs,
             max_diffusion_step=max_diffusion_step,
-            act=None,
         )
 
     def forward(
-        self, x: Tensor, As: List[Tensor], ycl: Optional[Tensor] = None, iteration: Optional[int] = None
+        self, 
+        x: Tensor, 
+        As: List[Tensor], 
+        ycl: Optional[Tensor] = None, 
+        iteration: Optional[int] = None, 
+        **kwargs: Any,
     ) -> Tuple[Tensor, None, None]:
         """Forward pass.
 
@@ -115,16 +118,8 @@ class DCRNN(nn.Module):
 
 class _Encoder(nn.Module):
     """DCRNN encoder."""
-
-    def __init__(
-        self,
-        in_dim: int,
-        h_dim: int,
-        n_layers: int,
-        n_adjs: int = 2,
-        max_diffusion_step: int = 2,
-        act: Optional[str] = None,
-    ):
+    
+    def __init__(self, in_dim: int, h_dim: int, n_layers: int, n_adjs: int = 2, max_diffusion_step: int = 2) -> None:
         super(_Encoder, self).__init__()
 
         # Model blocks
@@ -132,7 +127,7 @@ class _Encoder(nn.Module):
         for layer in range(n_layers):
             in_dim = in_dim if layer == 0 else h_dim
             self.encoder.append(
-                DCGRU(in_dim=in_dim, h_dim=h_dim, n_adjs=n_adjs, max_diffusion_step=max_diffusion_step, act=act)
+                DCGRU(in_dim=in_dim, h_dim=h_dim, n_adjs=n_adjs, max_diffusion_step=max_diffusion_step)
             )
 
     def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
@@ -172,8 +167,7 @@ class _Decoder(nn.Module):
         n_layers: int,
         n_adjs: int = 2,
         max_diffusion_step: int = 2,
-        act: Optional[str] = None,
-    ):
+    ) -> None:
         super(_Decoder, self).__init__()
 
         # Network parameters
@@ -184,7 +178,7 @@ class _Decoder(nn.Module):
         for layer in range(n_layers):
             in_dim = in_dim if layer == 0 else h_dim
             self.decoder.append(
-                DCGRU(in_dim=in_dim, h_dim=h_dim, n_adjs=n_adjs, max_diffusion_step=max_diffusion_step, act=act)
+                DCGRU(in_dim=in_dim, h_dim=h_dim, n_adjs=n_adjs, max_diffusion_step=max_diffusion_step)
             )
         self.out_proj = nn.Linear(h_dim, out_dim)
 

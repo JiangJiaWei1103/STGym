@@ -1,20 +1,21 @@
 """
 Baseline method, GWNet [IJCAI, 2019].
-Author: JiaWei Jiang
+Author: JiaWei Jiang, ChunWei Shen
 
 Reference:
 * Paper: https://arxiv.org/abs/1906.00121
 * Code: https://github.com/nnzhan/Graph-WaveNet
 """
+from omegaconf import ListConfig
 from typing import Any, Dict, List, Tuple
 
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from modeling.sotas.gs_learner import GWNetGSLearner
-from modeling.sotas.layers import GWNetLayer
-from modeling.sotas.sub_layers import Linear2d
+from modeling.module.gs_learner import GWNetGSLearner
+from modeling.module.layers import GWNetLayer
+from modeling.module.common_layers import Linear2d
 
 
 class GWNet(nn.Module):
@@ -46,6 +47,7 @@ class GWNet(nn.Module):
 
         # Network parameters
         self.st_params = st_params
+        # Spatio-temporal pattern extractor
         n_layers = st_params["n_layers"]
         tcn_in_dim = st_params["tcn_in_dim"]
         gcn_in_dim = st_params["gcn_in_dim"]
@@ -69,11 +71,11 @@ class GWNet(nn.Module):
         self.gwnet_layers = nn.ModuleList()
         self.skip_convs = nn.ModuleList()
         for layer in range(n_layers):
-            if isinstance(dilation_factor, list):
+            if isinstance(dilation_factor, ListConfig):
                 d = dilation_factor[layer]
             else:
                 d = pow(dilation_factor, layer)
-            self._receptive_field += d
+            self._receptive_field += d * (kernel_size - 1)
 
             self.gwnet_layers.append(
                 GWNetLayer(
@@ -87,7 +89,7 @@ class GWNet(nn.Module):
                     bn=bn,
                 )
             )
-            self.skip_convs.append(Linear2d(tcn_in_dim, skip_dim))
+            self.skip_convs.append(Linear2d(gcn_in_dim, skip_dim))
         # Output layer
         self.output = nn.Sequential(nn.ReLU(), Linear2d(skip_dim, end_dim), nn.ReLU(), Linear2d(end_dim, out_dim))
 
@@ -104,6 +106,7 @@ class GWNet(nn.Module):
         Shape:
             x: (B, P, N, C)
             As: each A with shape (N, N)
+            output: (B, Q, N)
         """
         # Input linear layer
         x = x.permute(0, 3, 2, 1)  # (B, C, N, P)

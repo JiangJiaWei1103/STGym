@@ -1,18 +1,19 @@
 """
 Common sptio-temporal layers.
-Author: JiaWei Jiang
+Author: JiaWei Jiang, ChunWei Shen
 """
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Type
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from modeling.module.tconv import TConvBaseModule
+from .tconv import TConvBaseModule
 
-from .sub_layers import DiffusionConvLayer, DilatedInception, GatedTCN, InfoPropLayer
-
+from .common_layers import Linear2d
+from .temporal_layers import GatedTCN, DilatedInception, TemporalConvLayer
+from .spatial_layers import DiffusionConvLayer, ChebGraphConv, InfoPropLayer, STSGCM
 
 class DCGRU(nn.Module):
     """Diffusion convolutional gated recurrent unit.
@@ -24,11 +25,14 @@ class DCGRU(nn.Module):
             *Note: Bidirectional transition matrices are used in the
                 original proposal.
         max_diffusion_step: maximum diffusion step
-        act: activation function
     """
 
     def __init__(
-        self, in_dim: int, h_dim: int, n_adjs: int = 2, max_diffusion_step: int = 2, act: Optional[str] = None
+        self, 
+        in_dim: int, 
+        h_dim: int, 
+        n_adjs: int = 2, 
+        max_diffusion_step: int = 2, 
     ) -> None:
         super(DCGRU, self).__init__()
 
@@ -38,10 +42,10 @@ class DCGRU(nn.Module):
         # Model blocks
         cat_dim = in_dim + h_dim
         self.gate = DiffusionConvLayer(
-            in_dim=cat_dim, h_dim=h_dim * 2, n_adjs=n_adjs, max_diffusion_step=max_diffusion_step, act=act
+            in_dim=cat_dim, h_dim=h_dim * 2, n_adjs=n_adjs, max_diffusion_step=max_diffusion_step
         )
         self.candidate_act = DiffusionConvLayer(
-            in_dim=cat_dim, h_dim=h_dim, n_adjs=n_adjs, max_diffusion_step=max_diffusion_step, act=act
+            in_dim=cat_dim, h_dim=h_dim, n_adjs=n_adjs, max_diffusion_step=max_diffusion_step
         )
 
     def forward(self, x: Tensor, As: List[Tensor], h_0: Optional[Tensor] = None) -> Tuple[Tensor, Tensor]:
@@ -94,6 +98,66 @@ class DCGRU(nn.Module):
         return h_0
 
 
+class STConvBlock(nn.Module):
+    """Spatial-temporal convolutional block of STGCN.
+
+    Args:
+        in_dim: input feature dimension
+        h_dims: list of hidden dimension
+        n_series: number of nodes
+        kernel_size: kernel size
+        cheb_k: order of Chebyshev Polynomials Approximation
+        act: activation function
+        dropout: dropout ratio
+    """
+
+    def __init__(
+        self,
+        in_dim: int,
+        h_dims: List[List[int]],
+        n_series: int,
+        kernel_size: int,
+        cheb_k: int,
+        act: str,
+        dropout: float
+    ) -> None:
+        super(STConvBlock, self).__init__()
+
+        # Model blocks
+        # Temporal convolution layer
+        self.tcn1 = TemporalConvLayer(in_channels=in_dim, out_channels=h_dims[0], kernel_size=kernel_size, act=act)
+        self.tcn2 = TemporalConvLayer(in_channels=h_dims[1], out_channels=h_dims[2], kernel_size=kernel_size, act=act)
+        # Chebyshev Graph convolution layer
+        self.gcn = ChebGraphConv(in_dim=h_dims[0], h_dim=h_dims[1], cheb_k=cheb_k)
+
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(p=dropout)
+        self.ln = nn.LayerNorm([n_series, h_dims[2]])
+
+    def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+            As: list of adjacency matrices
+
+        Returns:
+            h: output node embedding
+
+        Shape:
+            x: (B, C, N, L), where L denotes the input sequence length
+            As: each A with shape (N, N)
+        """
+        h = self.tcn1(x)
+        h = self.gcn(h, As)
+        h = self.relu(h)
+        h = self.tcn2(h)
+        h = self.ln(h.permute(0, 3, 2, 1)).permute(0, 3, 2, 1)  # (B, L, N, C') -> (B, C', N, L)
+        h = self.dropout(h)
+
+        return h
+
+
 class GWNetLayer(nn.Module):
     """Spatio-temporal layer of GWNet.
 
@@ -105,6 +169,7 @@ class GWNetLayer(nn.Module):
         h_dim: hidden dimension
         kernel_size: kernel size
         dilation_factor: dilation factor
+        gcn: if True, apply graph convolution
         n_adjs: number of adjacency matrices
             *Note: Bidirectional transition matrices are used in the
                 original proposal.
@@ -119,6 +184,7 @@ class GWNetLayer(nn.Module):
         h_dim: int,
         kernel_size: int,
         dilation_factor: int,
+        gcn: bool = True,
         n_adjs: int = 3,
         gcn_depth: int = 2,
         gcn_dropout: float = 0.3,
@@ -126,17 +192,25 @@ class GWNetLayer(nn.Module):
     ) -> None:
         super(GWNetLayer, self).__init__()
 
+        # Netwrok parameters
+        self.gcn = gcn
+
         # Model blocks
         # Gated temporal convolution layer
         self.tcn = GatedTCN(in_dim=in_dim, h_dim=h_dim, kernel_size=kernel_size, dilation_factor=dilation_factor)
+
         # Graph convolution layer
-        self.gcn = InfoPropLayer(in_dim=h_dim, h_dim=in_dim, n_adjs=n_adjs, depth=gcn_depth, dropout=gcn_dropout)
+        if gcn:
+            self.gcn = InfoPropLayer(in_dim=h_dim, h_dim=in_dim, n_adjs=n_adjs, depth=gcn_depth, dropout=gcn_dropout)
+        else:
+            self.resid = Linear2d(in_features=h_dim, out_features=h_dim)
+
         if bn:
             self.bn = nn.BatchNorm2d(in_dim)
         else:
             self.bn = None
 
-    def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
+    def forward(self, x: Tensor, As: Optional[List[Tensor]] = None) -> Tensor:
         """Forward pass.
 
         Args:
@@ -159,10 +233,13 @@ class GWNetLayer(nn.Module):
         h_tcn = self.tcn(x)
 
         # Graph convolution layer
-        h = self.gcn(h_tcn, As)
+        if self.gcn:
+            h = self.gcn(h_tcn, As)
+        else:
+            h = self.resid(h_tcn)
 
-        out_len = h.shape[-1]
-        h = h + x_resid[..., -out_len:]
+        _, h_dim, _, out_len = h.shape
+        h = h + x_resid[:, :h_dim, :, -out_len:]
         if self.bn is not None:
             h = self.bn(h)
 
@@ -193,7 +270,7 @@ class MTGNNLayer(TConvBaseModule):
         beta: retaining ratio for preserving locality
         ln_affine: if True, enable elementwise affine parameters
     """
-
+    
     def __init__(
         self,
         n_layers: int,
@@ -204,7 +281,6 @@ class MTGNNLayer(TConvBaseModule):
         kernel_size: List[int],
         dilation_exponential: int,
         tcn_dropout: float = 0.3,
-        n_adjs: int = 3,
         gcn_depth: int = 2,
         beta: float = 0.05,
         ln_affine: bool = True,
@@ -229,7 +305,17 @@ class MTGNNLayer(TConvBaseModule):
         self.gcn = InfoPropLayer(
             in_dim=h_dim,
             h_dim=in_dim,
-            n_adjs=n_adjs,
+            n_adjs=1,
+            depth=gcn_depth,
+            flow="tgt_to_src",  # Row norm
+            normalize="asym",
+            mix_prop=True,
+            beta=beta,
+        )
+        self.gcn_t = InfoPropLayer(
+            in_dim=h_dim,
+            h_dim=in_dim,
+            n_adjs=1,
             depth=gcn_depth,
             flow="tgt_to_src",  # Row norm
             normalize="asym",
@@ -263,10 +349,75 @@ class MTGNNLayer(TConvBaseModule):
         h_tcn = self.tcn(x)
 
         # Mix-hop propagation layer
-        h = self.gcn(h_tcn, As)
+        h = self.gcn(h_tcn, [As[0]]) + self.gcn_t(h_tcn, [As[1]])
 
         out_len = h.shape[-1]
         h = h + x_resid[..., -out_len:]
         h = self.ln(h)
 
         return h_tcn, h
+    
+
+class STSGCL(nn.Module):
+    """Spatial-Temporal Synchronous Graph Convolutional Layer."""
+
+    def __init__(
+        self, 
+        in_dim: int, 
+        h_dim: int, 
+        gcn_depth: int, 
+        n_series: int,
+        t_window: int,  
+        act: str, 
+        t_emb_dim: int, 
+        s_emb_dim: int
+    ) -> None:
+        super(STSGCL, self).__init__()
+        
+        # Network parameters
+        self.in_dim = in_dim
+        self.n_series = n_series
+        self.t_window = t_window
+
+        # Model blocks
+        self.stsgcm = nn.ModuleList()
+        for _ in range(t_window - 2):
+            self.stsgcm.append(STSGCM(in_dim=in_dim, h_dim=h_dim, gcn_depth=gcn_depth, n_series=n_series, act=act))
+
+        self.spatial_emb, self.temporal_emb = None, None
+        # Temporal embedding
+        if t_emb_dim > 0:
+            self.temporal_emb = nn.init.xavier_normal_(torch.empty(1, t_window, 1, t_emb_dim), gain=0.0003)
+        # Spatial embedding
+        if s_emb_dim > 0:
+            self.spatial_emb = nn.init.xavier_normal_(torch.empty(1, 1, n_series, s_emb_dim), gain=0.0003)
+
+    def forward(self, x: Tensor, A: Tensor) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+            A: adjacency matrix
+
+        Shape:
+            x: (B, L, N, C)
+            A: (3N, 3N)
+            output: (B, L - 2, N, C')
+        """
+        # Spatial Temporal embedding
+        if self.spatial_emb is not None:
+            x = x + self.spatial_emb.to(x.device)
+        if self.temporal_emb is not None:
+            x = x + self.temporal_emb.to(x.device)
+
+        # Spatial-Temporal Synchronous Graph Convolutional Module
+        x_convs = []
+        for i in range(self.t_window - 2):
+            h = x[:, i : i + 3, :, :]                               # (B, 3, N, C)
+            h = h.reshape([-1, 3 * self.n_series, self.in_dim])     # (B, 3N, C)
+            h = h.permute(1, 0, 2)                                  # (3N, B, C)
+            h = self.stsgcm[i](h, A).permute(1, 0, 2)               # (B, N, C')
+            x_convs.append(h)
+        output = torch.stack(x_convs, dim=1)             # (B, T-2, N, C')
+
+        return output

@@ -1,7 +1,8 @@
 """
 Self-adaptive graph structure learner.
-Author: JiaWei Jiang
+Author: JiaWei Jiang, ChunWei Shen
 """
+import numpy as np
 from typing import Optional
 
 import torch
@@ -94,7 +95,7 @@ class MTGNNGSLearner(nn.Module):
         A_soft = F.relu(F.tanh(self.alpha * (m1 @ m2.T - m2 @ m1.T)))
 
         # Perform KNN-like sparsification
-        A_doped = A_soft + torch.rand_like(A_soft) * 1e-4
+        A_doped = A_soft + torch.rand_like(A_soft) * 0.01
         topk_val, topk_idx = torch.topk(A_doped, self.k)  # Along the last dim
         mask = torch.zeros(A_doped.size()).to(A_doped.device)
         mask.scatter_(1, topk_idx, topk_val.fill_(1))

@@ -1,0 +1,19 @@
+# model/STGCN
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.STGCN.STGCN
+    # Spatial/Temporal pattern extractor
+    st_params:
+        st_h_dims: [[64, 16, 64], [64, 16, 64]]
+        kernel_size: 3
+        n_series: 207
+        cheb_k: 3
+        act: "glu"
+        dropout: 0.5
+    in_dim: 1
+    in_len: 12
+    end_dim: 128
+    out_len: 12
+
+fit_params:
