@@ -26,6 +26,7 @@ from data.data_processor import DataProcessor
 from experiment.experiment import Experiment
 from trainer.trainer import MainTrainer
 from utils.common import count_params
+from utils.early_stopping import EarlyStopping
 
 warnings.simplefilter("ignore")
 
@@ -117,6 +118,12 @@ def main(cfg: DictConfig) -> None:
                 else:
                     lr_skd = lr_skd_partial(optimizer=optimizer)
 
+                # Build early stopping tracker
+                if exp.trainer_cfg["es"]["patience"] != 0:
+                    es = EarlyStopping(exp.trainer_cfg["es"]["patience"], exp.trainer_cfg["es"]["mode"])
+                else:
+                    es = None
+
                 # Build evaluator
                 evaluator = instantiate(exp.trainer_cfg["evaluator"])
 
@@ -129,7 +136,7 @@ def main(cfg: DictConfig) -> None:
                     loss_fn=loss_fn,
                     optimizer=optimizer,
                     lr_skd=lr_skd,
-                    es=None,
+                    es=es,
                     ckpt_path=exp.ckpt_path,
                     evaluator=evaluator,
                     scaler=scaler,
