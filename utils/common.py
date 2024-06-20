@@ -176,3 +176,9 @@ def calculate_normalized_laplacian(adj: np.ndarray) -> coo_matrix:
     normalized_laplacian = sp.eye(adj.shape[0]) - adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
 
     return normalized_laplacian
+
+def binary(adj_mat: np.ndarray) -> Tensor:
+    adj_mat[adj_mat > 0] = 1
+    adj_mat = torch.tensor(adj_mat)
+
+    return adj_mat

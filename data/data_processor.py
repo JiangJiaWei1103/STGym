@@ -19,7 +19,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 from torch import Tensor
 
 from metadata import N_DAYS_IN_WEEK, N_SERIES, MTSFBerks, TrafBerks
-from utils.common import asym_norm, calculate_random_walk_matrix, calculate_scaled_laplacian, sym_norm
+from utils.common import asym_norm, calculate_random_walk_matrix, calculate_scaled_laplacian, sym_norm, binary
 from utils.scaler import MaxScaler, MinMaxScaler, StandardScaler
 
 
@@ -202,6 +202,8 @@ class DataProcessor(object):
                     calculate_random_walk_matrix(adj_mat).T,
                     calculate_random_walk_matrix(adj_mat.T).T,
                 ]
+            elif priori_gs_type == "binary":
+                self._priori_adj_mat = [binary(adj_mat)]
             else:
                 raise RuntimeError(f"Priori GS {priori_gs_type} isn't registered.")
 
