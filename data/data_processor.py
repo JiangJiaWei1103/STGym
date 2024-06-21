@@ -104,6 +104,10 @@ class DataProcessor(object):
         if self.priori_gs["type"] is not None:
             self._init_priori_gs()
 
+        # Load auxiliary data if provided
+        if self.aux_data_path is not None:
+            self._load_aux_data()
+
         logging.info("Done.")
 
     def run_after_splitting(self, data_tr: np.ndarray, data_val: np.ndarray) -> Tuple[np.ndarray, np.ndarray, Any]:
@@ -249,10 +253,9 @@ class DataProcessor(object):
 
     def _load_aux_data(self) -> None:
         """Load auxiliary data."""
-        file_path = self.aux_data_path["file_path"]
         self._aux_data = []
 
-        for path in file_path:
+        for path in self.aux_data_path:
             if path.endswith("npz"):
                 self._aux_data.append(np.load(path, allow_pickle=True))
             elif path.endswith("txt"):

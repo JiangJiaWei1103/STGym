@@ -87,7 +87,7 @@ class MainTrainer(BaseTrainer):
         self.train_loader = train_loader
         self.eval_loader = eval_loader if eval_loader else train_loader
         self.priori_gs = None if priori_gs is None else [A.to(self.device) for A in priori_gs]
-        self.aux_data = None if aux_data is None else [data.to(self.device) for data in aux_data]
+        self.aux_data = None if aux_data is None else aux_data
         self.scaler = scaler
         self.rescale = proc_cfg["rescale"]
         self.custom_loss = proc_cfg["custom_loss"]
