@@ -102,3 +102,41 @@ class MTGNNGSLearner(nn.Module):
         A = A_soft * mask
 
         return A
+   
+
+class AGCRNGSLearner(nn.Module):
+    """Graph structure learner of AGCRN.
+
+    Args:
+        n_nodes: number of nodes (i.e., series)
+        cheb_k: order of chebyshev polynomial expansion
+    """
+
+    def __init__(self, n_nodes: int, cheb_k: int) -> None:
+        super(AGCRNGSLearner, self).__init__()
+
+        # Network parameters
+        self.n_nodes = n_nodes
+        self.cheb_k = cheb_k
+
+    def forward(self, node_emb: Tensor) -> Tensor:
+        """Forward pass.
+
+        Args:
+            node_emb: node embedding matrix
+
+        Returns:
+            A: self-adaptive adjacency matrix
+
+        Shape:
+            A: (k, N, N)
+        """
+        A_soft = F.softmax(F.relu(torch.mm(node_emb, node_emb.transpose(0, 1))), dim=1)
+
+        As = [torch.eye(self.n_nodes).to(A_soft.device), A_soft]
+        for k in range(2, self.cheb_k):
+            As.append(torch.matmul(2 * A_soft, As[-1]) - As[-2])
+
+        A = torch.stack(As, dim=0)
+
+        return A

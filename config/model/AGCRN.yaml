@@ -1,0 +1,19 @@
+# model/AGCRN
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.AGCRN.AGCRN
+    # Spatial/Temporal pattern extractor
+    st_params:
+        n_layers: 2
+        h_dim: 64
+        cheb_k: 2
+        n_series: 207
+    # Data Adaptive Graph Generation
+    dagg_params:
+        emb_dim: 10
+    in_dim: 2
+    out_dim: 1
+    out_len: 12
+
+fit_params:

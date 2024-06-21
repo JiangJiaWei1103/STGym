@@ -13,7 +13,7 @@ from .tconv import TConvBaseModule
 
 from .common_layers import Linear2d
 from .temporal_layers import GatedTCN, DilatedInception, TemporalConvLayer
-from .spatial_layers import DiffusionConvLayer, ChebGraphConv, InfoPropLayer, STSGCM
+from .spatial_layers import DiffusionConvLayer, ChebGraphConv, InfoPropLayer, STSGCM, NAPLConvLayer
 
 class DCGRU(nn.Module):
     """Diffusion convolutional gated recurrent unit.
@@ -421,3 +421,74 @@ class STSGCL(nn.Module):
         output = torch.stack(x_convs, dim=1)             # (B, T-2, N, C')
 
         return output
+
+
+class AGCGRU(nn.Module):
+    """Adaptive graph convolutional gated recurrent unit.
+
+    Args:
+        in_dim: input feature dimension
+        h_dim: hidden state dimension
+        emb_dim: embedding dimension
+        cheb_k: order of chebyshev polynomial expansion
+    """
+
+    def __init__(self, in_dim: int, h_dim: int, emb_dim: int, cheb_k: int) -> None:
+        super(AGCGRU, self).__init__()
+
+        # Network parameters
+        self.h_dim = h_dim
+
+        # Model blocks
+        cat_dim = in_dim + h_dim
+        self.gate = NAPLConvLayer(in_dim=cat_dim, h_dim=h_dim * 2, emb_dim=emb_dim, cheb_k=cheb_k)
+        self.candidate_act = NAPLConvLayer(in_dim=cat_dim, h_dim=h_dim, emb_dim=emb_dim, cheb_k=cheb_k)
+
+    def forward(
+        self, x: Tensor, node_embs: Tensor, As: Tensor, h_0: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Tensor]:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+            node_embs: node embeddings
+            h_0: initial hidden state
+
+        Returns:
+            output: hidden state for each lookback time step
+            h_n: last hidden state
+
+        Shape:
+            x: (B, L, N, C), where L denotes the input sequence length
+            h_0: (B, N, h_dim)
+            output: (B, L, N, h_dim)
+            h_n: (B, N, h_dim)
+        """
+        in_len = x.shape[1]
+
+        output = []
+        for t in range(in_len):
+            x_t = x[:, t, ...]  # (B, N, C)
+            if t == 0:
+                h_t = None
+                h_prev = self._init_hidden_state(x) if h_0 is None else h_0
+            else:
+                h_prev = h_t
+
+            gate = F.sigmoid(self.gate(torch.cat([h_prev, x_t], dim=-1), node_embs, As))
+            r_t, u_t = torch.split(gate, self.h_dim, dim=-1)  # (B, N, h_dim)
+            c_t = F.tanh(self.candidate_act(torch.cat([r_t * h_prev, x_t], dim=-1), node_embs, As))
+            h_t = u_t * h_prev + (1 - u_t) * c_t  # (B, N, h_dim)
+
+            output.append(h_t.unsqueeze(dim=1))
+        output = torch.cat(output, dim=1)  # (B, L, N, h_dim)
+        h_n = h_t
+
+        return output, h_n
+
+    def _init_hidden_state(self, x: Tensor) -> Tensor:
+        """Initialize the initial hidden state."""
+        batch_size, _, n_series = x.shape[:-1]
+        h_0 = torch.zeros(batch_size, n_series, self.h_dim, device=x.device)
+
+        return h_0

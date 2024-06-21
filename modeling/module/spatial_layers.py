@@ -269,6 +269,43 @@ class STSGCM(nn.Module):
         return output
 
 
+class NAPLConvLayer(nn.Module):
+    """ Node Adaptive Parameter Learning Graph Convolution Layer."""
+
+    def __init__(self, in_dim: int, h_dim: int, emb_dim: int, cheb_k: int) -> None:
+        super(NAPLConvLayer, self).__init__()
+
+        # Network parameters
+        self.cheb_k = cheb_k
+
+        # Model blocks
+        self.weights_pool = nn.Parameter(torch.FloatTensor(emb_dim, cheb_k, in_dim, h_dim))
+        self.bias_pool = nn.Parameter(torch.FloatTensor(emb_dim, h_dim))
+
+    def forward(self, x: Tensor, node_embs: Tensor, As: Tensor) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input node embeddings
+            node_embs: node embeddings
+
+        Returns:
+            x_conv: output node embeddings
+
+        Shape:
+            x: (B, N, C)
+            node_emb: (N, D)
+            x_conv: (B, N, h_dim)
+        """
+        weights = torch.einsum('nd,dkio->nkio', (node_embs, self.weights_pool))   # (N, cheb_k, in_dim, out_dim)
+        bias = torch.matmul(node_embs, self.bias_pool)    # (N, out_dim)
+
+        x_conv = torch.einsum("knm,bmc->bknc", As, x).permute(0, 2, 1, 3)   # (B, N, cheb_k, in_dim)
+        x_conv = torch.einsum('bnki,nkio->bno', x_conv, weights) + bias     # (B, N, out_dim)
+
+        return x_conv
+
+
 class GCN2d(nn.Module):
     """Graph convolution layer over 2D planes.
 
