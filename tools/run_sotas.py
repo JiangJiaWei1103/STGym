@@ -17,30 +17,33 @@ def main():
         if data == "metr_la":
             cmd = "python -m tools.main model=DCRNN data=metr_la trainer/lr_skd=multistep\
                 'trainer.lr_skd.milestones=[20, 30, 40, 50]' trainer.lr_skd.gamma=0.1 trainer.optimizer.lr=0.01\
-                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 data.dp.priori_gs.type=dual_random_walk"
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 +trainer.optimizer.amsgrad=True\
+                data.dp.priori_gs.type=dual_random_walk"
         elif data == "pems_bay":
             cmd = "python -m tools.main model=DCRNN data=pems_bay trainer/lr_skd=multistep\
                 'trainer.lr_skd.milestones=[20, 30, 40, 50]' trainer.lr_skd.gamma=0.1 trainer.optimizer.lr=0.01\
-                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 data.dp.priori_gs.type=dual_random_walk"
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 +trainer.optimizer.amsgrad=True\
+                data.dp.priori_gs.type=dual_random_walk"
         elif data == "pems03":
             cmd = "python -m tools.main model=DCRNN data=pems03 trainer/lr_skd=multistep\
                 'trainer.lr_skd.milestones=[80]' trainer.lr_skd.gamma=0.3 trainer.optimizer.lr=0.003\
-                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 data.dp.priori_gs.type=dual_random_walk\
-                trainer.dataloader.batch_size=32"
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 +trainer.optimizer.amsgrad=True\
+                data.dp.priori_gs.type=dual_random_walk trainer.dataloader.batch_size=32"
         elif data == "pems04":
             cmd = "python -m tools.main model=DCRNN data=pems04 trainer/lr_skd=multistep\
                 'trainer.lr_skd.milestones=[80]' trainer.lr_skd.gamma=0.3 trainer.optimizer.lr=0.003\
-                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 data.dp.priori_gs.type=dual_random_walk\
-                trainer.dataloader.batch_size=32"
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 +trainer.optimizer.amsgrad=True\
+                data.dp.priori_gs.type=dual_random_walk trainer.dataloader.batch_size=32"
         elif data == "pems07":
             cmd = "python -m tools.main model=DCRNN data=pems07 trainer/lr_skd=multistep\
                 'trainer.lr_skd.milestones=[80]' trainer.lr_skd.gamma=0.3 trainer.optimizer.lr=0.003\
-                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 data.dp.priori_gs.type=dual_random_walk\
-                trainer.dataloader.batch_size=32"
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 +trainer.optimizer.amsgrad=True\
+                data.dp.priori_gs.type=dual_random_walk trainer.dataloader.batch_size=32"
         elif data == "pems08":
             cmd = "python -m tools.main model=DCRNN data=pems07 trainer/lr_skd=multistep\
                 'trainer.lr_skd.milestones=[80]' trainer.lr_skd.gamma=0.3 trainer.optimizer.lr=0.003\
-                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 data.dp.priori_gs.type=dual_random_walk"
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 +trainer.optimizer.amsgrad=True\
+                data.dp.priori_gs.type=dual_random_walk"
     elif model == "STGCN":
         if data == "metr_la":
             cmd = "python -m tools.main model=STGCN data=metr_la trainer/lr_skd=multistep trainer.optimizer.lr=0.002\
