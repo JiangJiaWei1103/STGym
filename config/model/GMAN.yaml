@@ -1,0 +1,16 @@
+# model/GMAN
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.GMAN.GMAN
+    # Spatial/Temporal Convolution Module
+    st_params:
+        n_layers: 5
+        n_heads: 8
+        h_dim: 64
+        n_tids: 288
+    in_len: 12
+    in_dim: 1
+    out_dim: 1
+
+fit_params:

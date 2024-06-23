@@ -1,0 +1,25 @@
+# model/GTS
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.GTS.GTS
+    # Spatial/Temporal pattern extractor
+    st_params:
+        n_layers: 1
+        enc_in_dim: 2
+        dec_in_dim: 1
+        h_dim: 64
+        out_dim: 1
+        n_adjs: 1
+        max_diffusion_step: 3
+        use_curriculum_learning: True
+        cl_decay_steps: 2000
+    # Graph structure learner
+    gsl_params:
+        fc_in_dim: 383552
+        train_ratio: 0.7
+        temperature: 0.5
+    n_series: 207
+    out_len: 12
+
+fit_params:

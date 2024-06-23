@@ -153,6 +153,74 @@ def main():
         elif data == "pems08":
             cmd = "python -m tools.main model=AGCRN data=pems08 trainer.lr_skd=null trainer.es.patience=30\
                 trainer.optimizer.lr=0.003 trainer.optimizer.weight_decay=0 model.model_params.st_params.n_series=170"
+    elif model == "GMAN":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=GMAN data=metr_la trainer/lr_skd=multistep trainer.es.patience=10\
+                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
+                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=16\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/metr_la/SE_metr_la.txt]'"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=GMAN data=pems_bay trainer/lr_skd=multistep trainer.es.patience=10\
+                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
+                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=8\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems_bay/SE_pems_bay.txt]'"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=GMAN data=pems03 trainer/lr_skd=multistep trainer.es.patience=10\
+                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
+                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=8\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems03/SE_pems03.txt]'"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=GMAN data=pems04 trainer/lr_skd=multistep trainer.es.patience=10\
+                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
+                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=8\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems04/SE_pems04.txt]'"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=GMAN data=pems07 trainer/lr_skd=multistep trainer.es.patience=10\
+                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
+                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=8\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems07/SE_pems07.txt]'"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=GMAN data=pems08 trainer/lr_skd=multistep trainer.es.patience=10\
+                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
+                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=16\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems08/SE_pems08.txt]'"
+    elif model == "GTS":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=GTS data=metr_la trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.lr_skd.gamma=0.1 'trainer.lr_skd.milestones=[20, 30, 40]' trainer.optimizer.lr=0.005\
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 model.model_params.n_series=207\
+                model.model_params.gsl_params.fc_in_dim=383552\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/metr_la/metr_la.h5]'"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=GTS data=pems_bay trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.lr_skd.gamma=0.1 'trainer.lr_skd.milestones=[20, 30, 40]' trainer.optimizer.lr=0.005\
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 model.model_params.n_series=325\
+                model.model_params.gsl_params.fc_in_dim=583408\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems_bay/pems_bay.h5]'"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=GTS data=pems03 trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.lr_skd.gamma=0.1 'trainer.lr_skd.milestones=[20, 30, 40]' trainer.optimizer.lr=0.005\
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 model.model_params.n_series=358\
+                model.model_params.gsl_params.train_ratio=0.6 model.model_params.gsl_params.fc_in_dim=251312\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems03/pems03.npz]'"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=GTS data=pems04 trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.lr_skd.gamma=0.1 'trainer.lr_skd.milestones=[20, 30, 40]' trainer.optimizer.lr=0.005\
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 model.model_params.n_series=307\
+                model.model_params.gsl_params.train_ratio=0.6 model.model_params.gsl_params.fc_in_dim=162832\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems04/pems04.npz]'"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=GTS data=pems07 trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.lr_skd.gamma=0.1 'trainer.lr_skd.milestones=[20, 30, 40]' trainer.optimizer.lr=0.005\
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 model.model_params.n_series=883\
+                model.model_params.gsl_params.train_ratio=0.6 model.model_params.gsl_params.fc_in_dim=270656\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems07/pems07.npz]'"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=GTS data=pems08 trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.lr_skd.gamma=0.1 'trainer.lr_skd.milestones=[20, 30, 40]' trainer.optimizer.lr=0.005\
+                trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 model.model_params.n_series=170\
+                model.model_params.gsl_params.train_ratio=0.6 model.model_params.gsl_params.fc_in_dim=171136\
+                'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems08/pems08.npz]'"
 
     os.system(cmd)
 

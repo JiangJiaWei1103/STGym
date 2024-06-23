@@ -11,7 +11,7 @@ from torch import Tensor
 
 from .tconv import TConvBaseModule
 
-from .common_layers import Linear2d
+from .common_layers import Linear2d, AttentionLayer, GatedFusion
 from .temporal_layers import GatedTCN, DilatedInception, TemporalConvLayer
 from .spatial_layers import DiffusionConvLayer, ChebGraphConv, InfoPropLayer, STSGCM, NAPLConvLayer
 
@@ -492,3 +492,51 @@ class AGCGRU(nn.Module):
         h_0 = torch.zeros(batch_size, n_series, self.h_dim, device=x.device)
 
         return h_0
+
+
+class GMANAttentionBlock(nn.Module):
+    """Spatial-temporal attention block."""
+
+    def __init__(
+        self, in_dim: int, h_dim: int, n_heads: int, mask: bool = True, act: str = "relu", bn: bool = True
+    ) -> None:
+        super(GMANAttentionBlock, self).__init__()
+
+        # Model blocks
+        # Spatial attention
+        self.spatial_attn = AttentionLayer(
+            in_dim=in_dim * 2, h_dim=h_dim, n_heads=n_heads, act=act, bn=bn, reset_params=True
+        )
+        # Temporal attention
+        self.temporal_attn = AttentionLayer(
+            in_dim=in_dim * 2, h_dim=h_dim, n_heads=n_heads, mask=mask, act=act, bn=bn, reset_params=True
+        )
+        # Gated Fusion
+        self.gated_fusion = GatedFusion(h_dim=h_dim)
+
+    def forward(self, x: Tensor, st_emb: Tensor) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+            st_emb: Spatial-Temporal embedding
+
+        Returns:
+            output: output hidden state
+        
+        Shape:
+            x: (B, L, N, in_dim)
+            st_emb: (B, L, N, in_dim)
+            output: (B, L, N, h_dim)
+        """
+        h = torch.cat((x, st_emb), dim=-1)                  # Concat along channel, (B, L, N, 2 * in_dim)
+        # Spatial attention
+        hs = self.spatial_attn(h, h, h)                     # (B, L, N, h_dim)
+        # Temporal attention
+        h = h.transpose(1, 2)                               # (B, N, L, h_dim)
+        ht = self.temporal_attn(h, h, h).transpose(1, 2)    # (B, L, N, h_dim)
+        # Gated Fusion
+        h = self.gated_fusion(hs, ht)              # (B, L, N, h_dim)
+        output = x + h                             # (B, L, N, h_dim)
+
+        return output

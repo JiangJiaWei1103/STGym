@@ -140,3 +140,131 @@ class AGCRNGSLearner(nn.Module):
         A = torch.stack(As, dim=0)
 
         return A
+
+
+class GTSGSLearner(nn.Module):
+    """Graph structure learner of GTS."""
+
+    def __init__(self, fc_in_dim: int, n_series: int, temperature: int) -> None:
+        super(GTSGSLearner, self).__init__()
+        
+        # Network parameters
+        self.n_series = n_series
+        self.temperature = temperature
+        kernel_size = 10
+        conv_h_dim = 8
+        conv_out_dim = 16
+        emb_dim = 100
+
+        # Model blocks
+        self.conv = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=conv_h_dim, kernel_size=kernel_size),
+            nn.ReLU(),
+            nn.BatchNorm1d(8),
+            nn.Conv1d(in_channels=conv_h_dim, out_channels=conv_out_dim, kernel_size=kernel_size),
+            nn.ReLU(),
+            nn.BatchNorm1d(16),
+
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(fc_in_dim, emb_dim),
+            nn.ReLU(),
+            nn.BatchNorm1d(emb_dim)
+        )
+        self.output = nn.Sequential(
+            nn.Linear(emb_dim * 2, emb_dim),
+            nn.ReLU(),
+            nn.Linear(emb_dim, 2)
+        )
+        # Generate off-diagonal interaction graph
+        off_diag = np.ones([n_series, n_series])
+        rel_rec = np.array(self._encode_onehot(np.where(off_diag)[0]), dtype=np.float32)
+        rel_send = np.array(self._encode_onehot(np.where(off_diag)[1]), dtype=np.float32)
+        self.rel_rec = torch.FloatTensor(rel_rec)
+        self.rel_send = torch.FloatTensor(rel_send)
+
+    def forward(self, node_features: Tensor) -> Tensor:
+        """Forward pass.
+
+        Returns:
+            As: self-adaptive adjacency matrix
+
+        Shape:
+            As: (N, N)
+        """
+        x = node_features.transpose(1, 0).view(self.n_series, 1, -1)
+        x = self.conv(x)
+        x = x.view(self.n_series, -1)
+        x = self.fc(x)
+
+        receivers = torch.matmul(self.rel_rec.to(x.device), x)
+        senders = torch.matmul(self.rel_send.to(x.device), x)
+        x = torch.cat([senders, receivers], dim=1)
+        x = self.output(x)
+
+        As = self._gumbel_softmax(x, temperature=self.temperature, hard=True)
+        As = As[:, 0].clone().reshape(self.n_series, -1)
+        mask = torch.eye(self.n_series, self.n_series).bool().to(x.device)
+        As.masked_fill_(mask, 0)
+
+        As = self._calculate_random_walk_matrix(As).t()
+
+        return As
+    
+    def _encode_onehot(self, labels: np.array) -> np.array:
+        """Encode onehot."""
+        classes = set(labels)
+        classes_dict = {c: np.identity(len(classes))[i, :] for i, c in enumerate(classes)}
+        labels_onehot = np.array(list(map(classes_dict.get, labels)), dtype=np.int32)
+
+        return labels_onehot
+    
+    def _sample_gumbel(self, logits: Tensor, eps: float = 1e-20) -> Tensor:
+        """Sample gumbel."""
+        U = torch.rand(logits.size()).to(logits.device)
+        return -torch.autograd.Variable(torch.log(-torch.log(U + eps) + eps))
+
+    def _gumbel_softmax_sample(self, logits: Tensor, temperature: int, eps: float = 1e-10) -> Tensor:
+        """Gumbel softmax sample."""
+        sample = self._sample_gumbel(logits, eps=eps)
+        y = logits + sample
+
+        return F.softmax(y / temperature, dim=-1)
+
+    def _gumbel_softmax(self, logits: Tensor, temperature: int, hard: bool = False, eps: float = 1e-10) -> Tensor:
+        """Sample from the Gumbel-Softmax distribution and optionally discretize.
+
+        Parameters:
+            logits: unnormalized log-probs
+            temperature: non-negative scalar
+            hard: if True, take argmax, but differentiate w.r.t. soft sample y
+
+        Return:
+            sample from the Gumbel-Softmax distribution.
+            If hard=True, then the returned sample will be one-hot, 
+            otherwise it will be a probabilitiy distribution that 
+            sums to 1 across classes.
+        """
+        y_soft = self._gumbel_softmax_sample(logits, temperature=temperature, eps=eps)
+
+        if hard:
+            shape = logits.size()
+            _, k = y_soft.data.max(-1)
+            y_hard = torch.zeros(*shape).to(logits.device)
+            y_hard = y_hard.zero_().scatter_(-1, k.view(shape[:-1] + (1,)), 1.0)
+            y = torch.autograd.Variable(y_hard - y_soft.data) + y_soft
+        else:
+            y = y_soft
+
+        return y
+    
+    def _calculate_random_walk_matrix(self, adj: Tensor) -> Tensor:
+        """Calculate random walk matrix."""
+        adj = adj + torch.eye(int(adj.shape[0])).to(adj.device)
+        d = torch.sum(adj, 1)
+        d_inv = 1. / d
+        d_inv = torch.where(torch.isinf(d_inv).to(adj.device), torch.zeros(d_inv.shape).to(adj.device), d_inv)
+        d_mat_inv = torch.diag(d_inv)
+        adj = torch.mm(d_mat_inv, adj)
+
+        return adj
