@@ -224,6 +224,45 @@ def main():
                 trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 model.model_params.n_series=170\
                 model.model_params.gsl_params.train_ratio=0.6 model.model_params.gsl_params.fc_in_dim=171136\
                 'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems08/pems08.npz]'"
+    elif model == "STNorm":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=STNorm data=metr_la trainer.lr_skd=null model.model_params.n_series=207"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=STNorm data=pems_bay trainer.lr_skd=null\
+                model.model_params.n_series=325"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=STNorm data=pems03 trainer.lr_skd=null model.model_params.n_series=358"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=STNorm data=pems04 trainer.lr_skd=null model.model_params.n_series=307"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=STNorm data=pems07 trainer.lr_skd=null model.model_params.n_series=883"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=STNorm data=pems08 trainer.lr_skd=null model.model_params.n_series=170"
+    elif model == "STID":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=STID data=metr_la trainer/lr_skd=multistep trainer.epochs=200\
+                'trainer.lr_skd.milestones=[1, 50, 80]' trainer.lr_skd.gamma=0.5 trainer.optimizer.lr=0.002\
+                trainer.dataloader.batch_size=32 data.dp.time_enc.add_diw=True model.model_params.n_series=207"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=STID data=pems_bay trainer/lr_skd=multistep trainer.epochs=200\
+                'trainer.lr_skd.milestones=[1, 50, 80]' trainer.lr_skd.gamma=0.5 trainer.optimizer.lr=0.002\
+                trainer.dataloader.batch_size=32 data.dp.time_enc.add_diw=True model.model_params.n_series=325"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=STID data=pems03 trainer/lr_skd=multistep trainer.epochs=200\
+                'trainer.lr_skd.milestones=[1, 50, 80]' trainer.lr_skd.gamma=0.5 trainer.optimizer.lr=0.002\
+                trainer.dataloader.batch_size=32 data.dp.time_enc.add_diw=True model.model_params.n_series=358"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=STID data=pems04 trainer/lr_skd=multistep trainer.epochs=200\
+                'trainer.lr_skd.milestones=[1, 50, 80]' trainer.lr_skd.gamma=0.5 trainer.optimizer.lr=0.002\
+                trainer.dataloader.batch_size=32 data.dp.time_enc.add_diw=True model.model_params.n_series=307"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=STID data=pems07 trainer/lr_skd=multistep trainer.epochs=200\
+                'trainer.lr_skd.milestones=[1, 50, 80]' trainer.lr_skd.gamma=0.5 trainer.optimizer.lr=0.002\
+                trainer.dataloader.batch_size=32 data.dp.time_enc.add_diw=True model.model_params.n_series=883"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=STID data=pems08 trainer/lr_skd=multistep trainer.epochs=200\
+                'trainer.lr_skd.milestones=[1, 50, 80]' trainer.lr_skd.gamma=0.5 trainer.optimizer.lr=0.002\
+                trainer.dataloader.batch_size=32 data.dp.time_enc.add_diw=True model.model_params.n_series=170"
 
     os.system(cmd)
 

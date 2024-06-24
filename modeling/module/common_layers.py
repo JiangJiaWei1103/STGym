@@ -243,6 +243,154 @@ class GatedFusion(nn.Module):
         return output
 
 
+class AuxInfoEmbeddings(nn.Module):
+    """Auxiliary information embeddings."""
+    
+    def __init__(
+        self,
+        n_tids: Optional[int] = None,
+        n_series: Optional[int] = None,
+        t_window: Optional[int] = None,
+        node_emb_dim: Optional[int] = 0,
+        tid_emb_dim: Optional[int] = 0,
+        diw_emb_dim: Optional[int] = 0,
+        adp_emb_dim: Optional[int] = 0,
+        single_node_emb: Optional[bool] = True,
+    ) -> None:
+        super(AuxInfoEmbeddings, self).__init__()
+
+        # Network parameters
+        self.n_series = n_series
+        self.node_emb_dim = node_emb_dim
+        self.tid_emb_dim = tid_emb_dim
+        self.diw_emb_dim = diw_emb_dim
+        self.adp_emb_dim = adp_emb_dim
+        self.single_node_emb = single_node_emb
+
+        # Model blocks
+        self.node_emb_in, self.node_emb_out, self.tid_emb, self.diw_emb, self.adp_emb = None, None, None, None, None
+        if node_emb_dim > 0:
+            self.node_emb_in = nn.Parameter(torch.empty(n_series, node_emb_dim))
+            nn.init.xavier_uniform_(self.node_emb_in)
+            if not single_node_emb:
+                self.node_emb_out = nn.Parameter(torch.empty(n_series, node_emb_dim))
+                nn.init.xavier_uniform_(self.node_emb_out)
+        if tid_emb_dim > 0:
+            self.tid_emb = nn.Parameter(torch.empty(n_tids, tid_emb_dim))
+            nn.init.xavier_uniform_(self.tid_emb)
+        if diw_emb_dim > 0:
+            self.diw_emb = nn.Parameter(torch.empty(N_DAYS_IN_WEEK, diw_emb_dim))
+            nn.init.xavier_uniform_(self.diw_emb)
+        if adp_emb_dim > 0:
+            self.adp_emb = nn.Parameter(torch.empty(t_window, n_series, adp_emb_dim))
+            nn.init.xavier_uniform_(self.adp_emb)
+
+    def forward(self, tid: Optional[Tensor] = None, diw: Optional[Tensor] = None) -> Tensor:
+        """Forward pass.
+
+        Shape:
+            tid: (B, N) or (B, T, N)
+            diw: (B, N) or (B, T, N)
+        """
+        x_node_in, x_node_out, x_tid, x_diw, x_adp = None, None, None, None, None
+
+        if self.node_emb_in is not None:
+            x_node_in = self.node_emb_in       # (N, node_emb_dim)
+            if not self.single_node_emb:
+                x_node_out = self.node_emb_out
+        if self.tid_emb is not None:
+            assert tid is not None, "Time in day isn't fed into the model."
+            x_tid = self.tid_emb[tid]    # (B, N, tid_emb_dim) or (B, T, N, tid_emb_dim)
+        if self.diw_emb is not None:
+            assert diw is not None, "Day in week isn't fed into the model."
+            x_diw = self.diw_emb[diw]    # (B, N, diw_emb_dim) or (B, T, N, diw_emb_dim)
+        if self.adp_emb is not None:
+            x_adp = self.adp_emb         # (N, T, adp_emb_dim)
+
+        return x_node_in, x_node_out, x_tid, x_diw, x_adp
+
+
+class SNorm(nn.Module):
+    """Spatial Normalization."""
+
+    def __init__(self, in_dim: int) -> None:
+        super(SNorm, self).__init__()
+
+        # Model blocks
+        self.beta = nn.Parameter(torch.zeros(in_dim))
+        self.gamma = nn.Parameter(torch.ones(in_dim))
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input
+
+        Returns:
+            output: output
+
+        Shape:
+            x: (B, in_dim, N, L)
+            output: (B, in_dim, N, L)
+        """
+        x_norm = (x - x.mean(2, keepdims=True)) / (x.var(2, keepdims=True, unbiased=True) + 0.00001) ** 0.5
+        output = x_norm * self.gamma.view(1, -1, 1, 1) + self.beta.view(1, -1, 1, 1)
+
+        return output
+
+
+class TNorm(nn.Module):
+    """Temporal Normalization.""" 
+
+    def __init__(
+        self, in_dim: int, n_series: int, track_running_stats: bool = True, momentum: float = 0.1
+    ) -> None:
+        super(TNorm, self).__init__()
+
+        # Network parameters
+        self.track_running_stats = track_running_stats
+        self.momentum = momentum
+
+        # Model blocks
+        self.beta = nn.Parameter(torch.zeros(1, in_dim, n_series, 1))
+        self.gamma = nn.Parameter(torch.ones(1, in_dim, n_series, 1))
+        self.register_buffer('running_mean', torch.zeros(1, in_dim, n_series, 1))
+        self.register_buffer('running_var', torch.ones(1, in_dim, n_series, 1))
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input
+
+        Returns:
+            output: output
+
+        Shape:
+            x: (B, in_dim, N, L)
+            output: (B, in_dim, N, L)
+        """
+        if self.track_running_stats:
+            mean = x.mean((0, 3), keepdims=True)
+            var = x.var((0, 3), keepdims=True, unbiased=False)
+            if self.training:
+                n = x.shape[3] * x.shape[0]
+                with torch.no_grad():
+                    self.running_mean = self.momentum * mean + (1 - self.momentum) * self.running_mean
+                    self.running_var = self.momentum * var * n / (n - 1) + (1 - self.momentum) * self.running_var
+            else:
+                mean = self.running_mean
+                var = self.running_var
+        else:
+            mean = x.mean((3), keepdims=True)
+            var = x.var((3), keepdims=True, unbiased=True)
+
+        x_norm = (x - mean) / (var + 0.00001) ** 0.5
+        output = x_norm * self.gamma + self.beta
+
+        return output
+
+
 class Align(nn.Module):
     """
     Ensure alignment of input feature dimensions for 
