@@ -1,0 +1,4 @@
+# trainer/lr_skd/exp
+_target_: torch.optim.lr_scheduler.ExponentialLR
+_partial_: True
+gamma: 0.95

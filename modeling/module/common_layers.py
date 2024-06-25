@@ -391,6 +391,30 @@ class TNorm(nn.Module):
         return output
 
 
+class Split(nn.Module):
+    """
+    Downsamples the original sequence into two sub-sequences
+    by separating the even and the odd elements.
+    """
+
+    def __init__(self) -> None:
+        super(Split, self).__init__()
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+
+        Shape:
+            x: (B, L, N)
+        """
+        x_even = x[:, ::2, :]
+        x_odd = x[:, 1::2, :]
+
+        return x_even, x_odd
+
+
 class Align(nn.Module):
     """
     Ensure alignment of input feature dimensions for 

@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-from .common_layers import Align
+from .common_layers import Align, Split
 
 # Temporal pattern extractor
 class GatedTCN(nn.Module):
@@ -196,3 +196,172 @@ class TemporalConvLayer(nn.Module):
             h = self.act_func(x_causal + x_resid)
         
         return h
+
+
+class SCIBlock(nn.Module):
+    def __init__(
+        self,
+        in_dim: int,
+        h_ratio: int = 1,
+        kernel_size: int = 5,
+        groups: int = 1,
+        dropout: float = 0.5,
+        split: bool = True,
+        INN: bool = True
+    ) -> None:
+        """SCI-Block.
+
+        Args:
+            in_dim: input dimension
+            h_ratio: in_dim * h_ratio = hidden dimension
+            kernel_size: kernel size
+            groups: groups
+            dropout: dropout ratio
+            split: if True, apply split
+            INN: if True, apply interactive learning
+        """
+
+        super(SCIBlock, self).__init__()
+
+        # Network parameters
+        self.splitting = split
+        self.INN = INN
+        # size of the padding
+        if kernel_size % 2 == 0:
+            pad_l = (kernel_size - 2) // 2 + 1
+            pad_r = (kernel_size) // 2 + 1
+        else:
+            pad_l = (kernel_size - 1) // 2 + 1
+            pad_r = (kernel_size - 1) // 2 + 1
+
+        # Model blocks
+        self.split = Split()
+        # Convolutional module
+        self.conv_phi = SCIConv(
+            in_dim=in_dim,
+            h_ratio=h_ratio,
+            kernel_size=kernel_size,
+            padding=(pad_l, pad_r),
+            groups=groups,
+            dropout=dropout
+        )
+        self.conv_psi = SCIConv(
+            in_dim=in_dim,
+            h_ratio=h_ratio,
+            kernel_size=kernel_size,
+            padding=(pad_l, pad_r),
+            groups=groups,
+            dropout=dropout
+        )
+        self.conv_p = SCIConv(
+            in_dim=in_dim,
+            h_ratio=h_ratio,
+            kernel_size=kernel_size,
+            padding=(pad_l, pad_r),
+            groups=groups,
+            dropout=dropout
+        )
+        self.conv_u = SCIConv(
+            in_dim=in_dim,
+            h_ratio=h_ratio,
+            kernel_size=kernel_size,
+            padding=(pad_l, pad_r),
+            groups=groups,
+            dropout=dropout
+        )
+
+    def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+        
+        Shape:
+            x: (B, L, N)
+            h_even: (B, L', N)
+            h_odd: (B, L', N)
+        """
+        # Split
+        if self.split:
+            x_even, x_odd = self.split(x)
+        else:
+            x_even, x_odd = x
+
+        # Interactive learning
+        if self.INN:
+            x_even = x_even.permute(0, 2, 1)    # (B, N, L)
+            x_odd = x_odd.permute(0, 2, 1)      # (B, N, L)
+
+            xs_odd = x_odd.mul(torch.exp(self.conv_phi(x_even)))
+            xs_even = x_even.mul(torch.exp(self.conv_psi(x_odd)))
+
+            h_even = xs_even + self.conv_u(xs_odd)
+            h_odd = xs_odd - self.conv_p(xs_even)
+
+            h_even = h_even.permute(0, 2, 1)    # (B, L', N)
+            h_odd = h_odd.permute(0, 2, 1)      # (B, L', N)
+
+            return h_even, h_odd
+        else:
+            x_even = x_even.permute(0, 2, 1)    # (B, N, L)
+            x_odd = x_odd.permute(0, 2, 1)      # (B, N, L)
+
+            h_even = x_even + self.conv_u(x_odd)
+            h_odd = x_odd - self.conv_p(x_even)
+        
+            h_even = h_even.permute(0, 2, 1)   # (B, L', N)
+            h_odd = h_odd.permute(0, 2, 1)     # (B, L', N)
+
+            return h_even, h_odd
+
+
+class SCIConv(nn.Module):
+    """SCINet 1d convolutional module."""
+
+    def __init__(
+        self, 
+        in_dim: int, 
+        h_ratio: float, 
+        kernel_size: int,
+        padding: Tuple[int], 
+        groups: int, 
+        dropout: float
+    ) -> None:
+        super(SCIConv, self).__init__()
+
+        # Model blocks
+        self.conv = nn.Sequential(
+            nn.ReplicationPad1d(padding=padding),
+            nn.Conv1d(
+                in_channels=in_dim,
+                out_channels=int(in_dim * h_ratio),
+                kernel_size=kernel_size,
+                groups=groups
+            ),
+            nn.LeakyReLU(negative_slope=0.01, inplace=True),
+            nn.Dropout(dropout),
+            nn.Conv1d(
+                in_channels=int(in_dim * h_ratio),
+                out_channels=in_dim,
+                kernel_size=3,
+                groups=groups
+            ),
+            nn.Tanh()
+        )
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+
+        Returns:
+            output: output sequence
+
+        Shape:
+            x: (B, N, L)
+            output: (B, N, L')
+        """
+        output = self.conv(x)
+
+        return output

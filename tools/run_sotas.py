@@ -263,6 +263,38 @@ def main():
             cmd = "python -m tools.main model=STID data=pems08 trainer/lr_skd=multistep trainer.epochs=200\
                 'trainer.lr_skd.milestones=[1, 50, 80]' trainer.lr_skd.gamma=0.5 trainer.optimizer.lr=0.002\
                 trainer.dataloader.batch_size=32 data.dp.time_enc.add_diw=True model.model_params.n_series=170"
+    elif model == "SCINet":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=SCINet data=metr_la trainer/lr_skd=exp trainer.epochs=80\
+                trainer.loss_fn._target_=torch.nn.L1Loss ~trainer.loss_fn.name data.dp.time_enc.add_tid=False"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=SCINet data=pems_bay trainer/lr_skd=exp trainer.epochs=80\
+                trainer.loss_fn._target_=torch.nn.L1Loss ~trainer.loss_fn.name data.dp.time_enc.add_tid=False\
+                trainer.dataloader.batch_size=8 model.model_params.n_series=325\
+                model.model_params.st_params.dataset_name=pems_bay"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=SCINet data=pems03 trainer/lr_skd=exp trainer.epochs=80\
+                trainer.loss_fn._target_=torch.nn.L1Loss ~trainer.loss_fn.name data.dp.time_enc.add_tid=False\
+                trainer.dataloader.batch_size=8 model.model_params.n_series=358\
+                model.model_params.st_params.dataset_name=pems03"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=SCINet data=pems04 trainer/lr_skd=exp trainer.epochs=80\
+                trainer.loss_fn._target_=torch.nn.L1Loss ~trainer.loss_fn.name data.dp.time_enc.add_tid=False\
+                trainer.dataloader.batch_size=8 model.model_params.n_series=307\
+                model.model_params.st_params.n_decoder_layer=1 model.model_params.st_params.dropout=0\
+                model.model_params.st_params.dataset_name=pems04"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=SCINet data=pems07 trainer/lr_skd=exp trainer.epochs=80\
+                trainer.loss_fn._target_=torch.nn.L1Loss ~trainer.loss_fn.name data.dp.time_enc.add_tid=False\
+                trainer.dataloader.batch_size=8 model.model_params.n_series=883\
+                model.model_params.st_params.n_decoder_layer=1 model.model_params.st_params.h_ratio=0.03125\
+                model.model_params.st_params.dataset_name=pems07"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=SCINet data=pems08 trainer/lr_skd=exp trainer.epochs=80\
+                trainer.loss_fn._target_=torch.nn.L1Loss ~trainer.loss_fn.name data.dp.time_enc.add_tid=False\
+                trainer.dataloader.batch_size=8 model.model_params.n_series=170\
+                model.model_params.st_params.n_decoder_layer=1 model.model_params.st_params.dropout=0.5\
+                model.model_params.st_params.h_ratio=1 model.model_params.st_params.dataset_name=pems08"
 
     os.system(cmd)
 

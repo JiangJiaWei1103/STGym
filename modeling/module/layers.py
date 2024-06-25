@@ -12,7 +12,7 @@ from torch import Tensor
 from .tconv import TConvBaseModule
 
 from .common_layers import Linear2d, AttentionLayer, GatedFusion
-from .temporal_layers import GatedTCN, DilatedInception, TemporalConvLayer
+from .temporal_layers import GatedTCN, DilatedInception, TemporalConvLayer, SCIBlock
 from .spatial_layers import DiffusionConvLayer, ChebGraphConv, InfoPropLayer, STSGCM, NAPLConvLayer
 
 class DCGRU(nn.Module):
@@ -540,3 +540,101 @@ class GMANAttentionBlock(nn.Module):
         output = x + h                             # (B, L, N, h_dim)
 
         return output
+
+
+class SCINetTree(nn.Module):
+    def __init__(
+        self, in_dim: int, h_ratio: int, kernel_size: int, groups: int, dropout: float, INN: bool, current_level: int
+    ) -> None:
+        """SCINet Tree.
+
+        Args:
+            in_dim: input dimension
+            h_ratio: in_dim * h_ratio = hidden dimension
+            kernel_size: kernel size
+            groups: groups
+            dropout: dropout ratio
+            INN: if True, apply interactive learning
+            current_level: current level of tree
+        """
+
+        super(SCINetTree, self).__init__()
+
+        # Network parameters
+        self.current_level = current_level
+
+        # Model blocks
+        self.sciblock = SCIBlock(
+            in_dim=in_dim,
+            h_ratio=h_ratio,
+            kernel_size=kernel_size,
+            groups=groups,
+            dropout=dropout,
+            INN=INN
+        )
+
+        if current_level != 0:
+            self.tree_odd = SCINetTree(
+                in_dim=in_dim,
+                h_ratio=h_ratio,
+                kernel_size=kernel_size,
+                groups=groups,
+                dropout=dropout,
+                INN=INN,
+                current_level=current_level - 1
+            )
+            self.tree_even = SCINetTree(
+                in_dim=in_dim,
+                h_ratio=h_ratio,
+                kernel_size=kernel_size,
+                groups=groups,
+                dropout=dropout,
+                INN=INN,
+                current_level=current_level - 1
+            )
+        
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass.
+
+        Args:
+            x: input sequence
+        """
+        h_even, h_odd = self.sciblock(x)
+
+        if self.current_level == 0:
+            return self.concat_and_realign(h_even, h_odd)
+        else:
+            return self.concat_and_realign(self.tree_even(h_even), self.tree_odd(h_odd))
+    
+    def concat_and_realign(self, x_even: Tensor, x_odd: Tensor) -> Tensor:
+        """Concat & Realign.
+
+        Args:
+            x_even: even sub-sequence
+            x_odd: odd sub-sequence
+
+        Shape:
+            x_even: (B, L, D)
+            x_odd: (B, L, D)
+            output: (B, L', D)
+        """
+
+        x_even = x_even.permute(1, 0, 2)    # (L, B, D)
+        x_odd = x_odd.permute(1, 0, 2)      # (L, B, D)
+
+        even_len = x_even.shape[0]
+        odd_len = x_odd.shape[0]
+        min_len = min((odd_len, even_len))
+
+        output = []
+        for i in range(min_len):
+            output.append(x_even[i].unsqueeze(0))
+            output.append(x_odd[i].unsqueeze(0))
+        
+        if odd_len < even_len: 
+            output.append(x_even[-1].unsqueeze(0))
+
+        output = torch.cat(output, dim=0).permute(1, 0, 2)
+
+        return  output
