@@ -22,15 +22,7 @@ from utils.scaler import MaxScaler, StandardScaler
 from modeling.module.layers import SCINetTree
 
 class SCINet(nn.Module):
-    def __init__(
-        self,
-        in_len: int,
-        out_len: int,
-        n_series: int,
-        st_params: Dict[str, Any],
-        loss_params: Dict[str, Any]
-    ):
-        """SCINet framework.
+    """SCINet framework.
 
         Args:
             in_len: input sequence length
@@ -48,8 +40,16 @@ class SCINet(nn.Module):
             dataset_name: dataset name
             lastWeight: loss weight for final step
             criterion: criterion
-        """
-
+    """
+    
+    def __init__(
+        self,
+        in_len: int,
+        out_len: int,
+        n_series: int,
+        st_params: Dict[str, Any],
+        loss_params: Dict[str, Any]
+    ) -> None:
         self.name = self.__class__.__name__
         super(SCINet, self).__init__()
 
@@ -216,9 +216,7 @@ class SCINet(nn.Module):
     
         return encoding
     
-    def smooth_l1_loss(
-        self, y_pred: Tensor, y_true: Tensor, beta: float = 1. / 9, size_average: bool = True
-    ) -> float:
+    def smooth_l1_loss(self, y_pred: Tensor, y_true: Tensor, beta: float = 1./9, size_average: bool = True) -> float:
         """Smooth L1 loss.
 
         Very similar to the smooth_l1_loss from pytorch,
@@ -317,11 +315,11 @@ class SCINet(nn.Module):
     
 
 class Encoder(nn.Module):
+    """Encoder Tree."""
+
     def __init__(
         self, in_dim: int, h_ratio: int, kernel_size: int, groups: int, dropout: float, INN: bool, n_levels: int
     ) -> None:
-        """Encoder Tree."""
-
         super(Encoder, self).__init__()
 
         self.SCINet_Tree = SCINetTree(

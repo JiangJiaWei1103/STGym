@@ -1,0 +1,25 @@
+# model/STAEformer
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.STAEformer.STAEformer
+    # Spatial/Temporal pattern extractor
+    st_params:
+        n_layers: 3
+        lin_h_dim: 24
+        ffl_h_dim: 256
+        n_heads: 4
+        node_emb_dim: 0
+        tid_emb_dim: 24
+        diw_emb_dim: 24
+        adp_emb_dim: 80
+        n_tids: 288
+        use_mixed_proj: True
+        dropout: 0.1
+    in_dim: 3
+    in_len: 12
+    out_dim: 1
+    out_len: 12
+    n_series: 207
+
+fit_params:

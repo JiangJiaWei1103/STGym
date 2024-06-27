@@ -306,6 +306,97 @@ class NAPLConvLayer(nn.Module):
         return x_conv
 
 
+class HyperGCN(nn.Module):
+    """Hyper-Network Graph convolution for DGCRN."""
+
+    def __init__(
+        self, in_dim: int, h_dim: int, mid_dim: int, node_emb_dim: int, depth: int, alpha: float, beta: float
+    ) -> None:
+        super(HyperGCN, self).__init__()
+
+        # Network parameters
+        self.depth = depth
+        self.alpha = alpha
+        self.beta = beta
+
+        # Model blocks
+        self.conv_filter = nn.Sequential(
+            nn.Linear((depth + 1) * in_dim, h_dim),
+            nn.Sigmoid(),
+            nn.Linear(h_dim, mid_dim),
+            nn.Sigmoid(),
+            nn.Linear(mid_dim, node_emb_dim)
+        )
+
+    def forward(self, x: Tensor, A: Tensor) -> Tensor:
+        """
+        Forward pass.
+
+        Args:
+            x: input sequence
+            A: adjacency matrix
+
+        Shape:
+            x: (B, N, C)
+            h: (B, N, C')
+        """
+        x_convs = [x]
+        x_conv = x
+
+        for k in range(self.depth):
+            x_conv = self.alpha * x + self.beta * torch.einsum("nvc,vw->nwc", (x_conv, A))
+            x_convs.append(x_conv)
+
+        h = torch.cat(x_convs, dim=-1)
+        h = self.conv_filter(h)
+
+        return h
+
+
+class DynamicMultiHopGCN(nn.Module):
+    """Dynamic multi-hop graph convolution layer."""
+
+    def __init__(self, in_dim: int, h_dim: int, depth: int, alpha: float, beta: float, gamma: float) -> None:
+        super(DynamicMultiHopGCN, self).__init__()
+
+        # Network parameters
+        self.depth = depth
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
+
+        # Model blocks
+        self.conv_filter = nn.Linear((depth + 1) * in_dim, h_dim)
+
+    def forward(self, x: Tensor, As: List[Tensor]) -> Tensor:
+        """
+        Forward pass.
+
+        Args:
+            x: input sequence
+            A: list of adjacency matrices
+
+        Shape:
+            x: (B, N, C)
+            h: (B, N, C')
+        """
+        x_convs = [x]
+        x_conv = x
+
+        for k in range(self.depth):
+            x_conv = (
+                self.alpha * x
+                + self.beta * torch.einsum("nvc,nvw->nwc", (x_conv, As[0]))
+                + self.gamma * torch.einsum("nvc,vw->nwc", (x_conv, As[1]))
+            )
+            x_convs.append(x_conv)
+
+        h = torch.cat(x_convs, dim=-1)
+        h = self.conv_filter(h)
+
+        return h
+
+
 class GCN2d(nn.Module):
     """Graph convolution layer over 2D planes.
 

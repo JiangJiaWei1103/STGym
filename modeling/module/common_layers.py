@@ -391,6 +391,49 @@ class TNorm(nn.Module):
         return output
 
 
+class Memory(nn.Module):
+    """Construct memory."""
+
+    def __init__(self, mem_num: int, mem_dim: int, h_dim: int, n_series: int) -> None:
+        super(Memory, self).__init__()
+
+        # Model blocks
+        self.memory = nn.Parameter(torch.randn(mem_num, mem_dim))   # (M, d)
+        self.Wq = nn.Parameter(torch.randn(h_dim, mem_dim))         # project to query
+        self.We1 = nn.Parameter(torch.randn(n_series, mem_num))     # project memory to embedding
+        self.We2 = nn.Parameter(torch.randn(n_series, mem_num))     # project memory to embedding
+
+        self._reset_parameters()
+
+    def _reset_parameters(self) -> None:
+        nn.init.xavier_normal_(self.memory)
+        nn.init.xavier_normal_(self.Wq)
+        nn.init.xavier_normal_(self.We1)
+        nn.init.xavier_normal_(self.We2)
+
+    def forward(self, x: Optional[Tensor] = None) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input
+
+        Shape:
+            x: (B, N, C)
+        """
+        if x is None:
+            return self.memory, self.We1, self.We2
+        else:
+            # Query memory
+            query = torch.matmul(x, self.Wq)     # (B, N, d)
+            att_score = torch.softmax(torch.matmul(query, self.memory.t()), dim=-1)   # (B, N, M)
+            value = torch.matmul(att_score, self.memory)     # (B, N, d)
+            _, ind = torch.topk(att_score, k=2, dim=-1)
+            pos = self.memory[ind[:, :, 0]]                  # (B, N, d)
+            neg = self.memory[ind[:, :, 1]]                  # (B, N, d)
+
+            return value, query, pos, neg
+
+
 class Split(nn.Module):
     """
     Downsamples the original sequence into two sub-sequences

@@ -3,13 +3,14 @@ Self-adaptive graph structure learner.
 Author: JiaWei Jiang, ChunWei Shen
 """
 import numpy as np
-from typing import Optional
+from typing import Optional, List
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
+from .spatial_layers import HyperGCN
 
 class GWNetGSLearner(nn.Module):
     """Graph structure learner of GWNet.
@@ -268,3 +269,104 @@ class GTSGSLearner(nn.Module):
         adj = torch.mm(d_mat_inv, adj)
 
         return adj
+
+
+class DGCRNGSLearner(nn.Module):
+    """Graph structure learner of DGCRN."""
+
+    def __init__(
+        self,
+        in_dim: int,
+        h_dim: int,
+        mid_dim: int,
+        depth: int,
+        n_series: int,
+        node_emb_dim: int,
+        act_alpha: float,
+        alpha: float,
+        gamma: float
+    ) -> None:
+        super(DGCRNGSLearner, self).__init__()
+
+        # Network parameters
+        self.act_alpha = act_alpha
+
+        # Model blocks
+        self.src_emb = nn.Embedding(n_series, node_emb_dim)
+        self.tgt_emb = nn.Embedding(n_series, node_emb_dim)
+        # Encoder
+        self.en_src_gcn = HyperGCN(in_dim, h_dim, mid_dim, node_emb_dim, depth, alpha, gamma)
+        self.en_src_gcn_t = HyperGCN(in_dim, h_dim, mid_dim, node_emb_dim, depth, alpha, gamma)
+        self.en_tgt_gcn = HyperGCN(in_dim, h_dim, mid_dim, node_emb_dim, depth, alpha, gamma)
+        self.en_tgt_gcn_t = HyperGCN(in_dim, h_dim, mid_dim, node_emb_dim, depth, alpha, gamma)
+        # Decoder
+        self.de_src_gcn = HyperGCN(in_dim, h_dim, mid_dim, node_emb_dim, depth, alpha, gamma)
+        self.de_src_gcn_t = HyperGCN(in_dim, h_dim, mid_dim, node_emb_dim, depth, alpha, gamma)
+        self.de_tgt_gcn = HyperGCN(in_dim, h_dim, mid_dim, node_emb_dim, depth, alpha, gamma)
+        self.de_tgt_gcn_t = HyperGCN(in_dim, h_dim, mid_dim, node_emb_dim, depth, alpha, gamma)
+    
+    def forward(self, node_idx: Tensor, x_hyper: Tensor, As: List[Tensor], gsl_type: str) -> Tensor:
+        """Forward pass.
+
+        Args:
+            node_idx: node indices
+            x_hyper: node feature matrix
+            As: list of predefined adjacency matrix
+
+        Returns:
+            A: dynamic adjacency matrix
+
+        Shape:
+            node_idx: (N, )
+            A: (N, N)
+        """
+        e1 = self.src_emb(node_idx)
+        e2 = self.tgt_emb(node_idx)
+
+        if gsl_type == "encoder":
+            filter1 = self.en_src_gcn(x_hyper, As[0]) + self.en_src_gcn_t(x_hyper, As[1])
+            filter2 = self.en_tgt_gcn(x_hyper, As[0]) + self.en_tgt_gcn_t(x_hyper, As[1])
+        else:
+            filter1 = self.de_src_gcn(x_hyper, As[0]) + self.de_src_gcn_t(x_hyper, As[1])
+            filter2 = self.de_tgt_gcn(x_hyper, As[0]) + self.de_tgt_gcn_t(x_hyper, As[1])
+
+        m1 = torch.tanh(self.act_alpha * torch.mul(e1, filter1))
+        m2 = torch.tanh(self.act_alpha * torch.mul(e2, filter2))
+
+        A_soft = F.relu(F.tanh(self.act_alpha * (m1 @ m2.transpose(1, 2) - m2 @ m1.transpose(1, 2))))
+
+        A, AT = self._normalize(A_soft), self._normalize(A_soft.transpose(1, 2))
+
+        return A, AT
+
+    def _normalize(self, A: Tensor) -> Tensor:
+        """Normalize adjacency matrix."""
+
+        A = A + torch.eye(A.size(-1)).to(A.device)
+        A = A / torch.unsqueeze(A.sum(-1), -1)
+
+        return A
+
+
+class MegaCRNGSLearner(nn.Module):
+    """Graph structure learner of MegaCRN."""
+
+    def __init__(self) -> None:
+        super(MegaCRNGSLearner, self).__init__()
+
+    def forward(self, memory: Tensor, w1: Tensor, w2: Tensor) -> Tensor:
+        """Forward pass.
+
+        Returns:
+            As: list of adjacency matrix
+
+        Shape:
+            As: each A with shape (N, N)
+        """
+        src_emb = torch.matmul(w1, memory)
+        tgt_emb = torch.matmul(w2, memory)
+        A1 = F.softmax(F.relu(torch.mm(src_emb, tgt_emb.T)), dim=-1)
+        A2 = F.softmax(F.relu(torch.mm(tgt_emb, src_emb.T)), dim=-1)
+        As = [A1, A2]
+
+        return As

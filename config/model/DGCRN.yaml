@@ -1,0 +1,26 @@
+# model/DGCRN
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.DGCRN.DGCRN
+    # Graph Learning Layer
+    gsl_params:
+        n_series: 207
+        node_emb_dim: 40
+        gsl_h_dim: 16
+        gsl_mid_dim: 2
+        act_alpha: 3
+    # Spatial/Temporal pattern extractor
+    st_params:
+        h_dim: 64
+        gcn_depth: 2
+        alpha: 0.05
+        beta: 0.95
+        gamma: 0.95
+        use_curriculum_learning: True
+        cl_decay_steps: 4000
+    in_dim: 2
+    out_dim: 1
+    out_len: 12
+
+fit_params:

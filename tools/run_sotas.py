@@ -111,6 +111,37 @@ def main():
         elif data == "pems08":
             cmd = "python -m tools.main model=MTGNN data=pems08 trainer.lr_skd=null trainer.dataloader.batch_size=32\
                 +trainer.cl.lv_up_period=1000 +trainer.cl.task_lv_max=12 model.model_params.gsl_params.n_series=170"
+    elif model == "DGCRN":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=DGCRN data=metr_la trainer/lr_skd=multistep trainer.epochs=150\
+                'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=2500 +trainer.cl.task_lv_max=12\
+                data.dp.priori_gs.type=dbl_transition model.model_params.gsl_params.n_series=207"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=DGCRN data=pems_bay trainer/lr_skd=multistep trainer.epochs=150\
+                'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=6500 +trainer.cl.task_lv_max=12\
+                trainer.dataloader.batch_size=32 data.dp.priori_gs.type=dbl_transition\
+                model.model_params.st_params.h_dim=96 model.model_params.st_params.cl_decay_steps=5500\
+                model.model_params.gsl_params.n_series=325"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=DGCRN data=pems03 trainer/lr_skd=multistep trainer.epochs=150\
+                'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=3000 +trainer.cl.task_lv_max=12\
+                trainer.dataloader.batch_size=32 data.dp.priori_gs.type=dbl_transition\
+                model.model_params.gsl_params.n_series=358"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=DGCRN data=pems04 trainer/lr_skd=multistep trainer.epochs=150\
+                'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=3000 +trainer.cl.task_lv_max=12\
+                trainer.dataloader.batch_size=32 data.dp.priori_gs.type=dbl_transition\
+                model.model_params.gsl_params.n_series=307"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=DGCRN data=pems07 trainer/lr_skd=multistep trainer.epochs=150\
+                'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=8500 +trainer.cl.task_lv_max=12\
+                trainer.dataloader.batch_size=12 data.dp.priori_gs.type=dbl_transition\
+                model.model_params.gsl_params.n_series=883"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=DGCRN data=pems07 trainer/lr_skd=multistep trainer.epochs=150\
+                'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=1500 +trainer.cl.task_lv_max=12\
+                trainer.dataloader.batch_size=32 data.dp.priori_gs.type=dbl_transition\
+                model.model_params.gsl_params.n_series=170"
     elif model == "STSGCN":
         if data == "metr_la":
             cmd = "python -m tools.main model=STSGCN data=metr_la trainer/lr_skd=multistep trainer.es.patience=30\
@@ -295,6 +326,72 @@ def main():
                 trainer.dataloader.batch_size=8 model.model_params.n_series=170\
                 model.model_params.st_params.n_decoder_layer=1 model.model_params.st_params.dropout=0.5\
                 model.model_params.st_params.h_ratio=1 model.model_params.st_params.dataset_name=pems08"
+    elif model == "STAEformer":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=STAEformer data=metr_la trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.max_grad_norm=null 'trainer.lr_skd.milestones=[20, 30]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=30 trainer.optimizer.weight_decay=0.0003 trainer.dataloader.batch_size=16\
+                data.dp.time_enc.add_diw=True model.model_params.n_series=207"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=STAEformer data=pems_bay trainer/lr_skd=multistep trainer.epochs=300\
+                trainer.max_grad_norm=null 'trainer.lr_skd.milestones=[10, 30]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.dataloader.batch_size=16 data.dp.time_enc.add_diw=True\
+                model.model_params.n_series=325"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=STAEformer data=pems03 trainer/lr_skd=multistep trainer.epochs=300\
+                trainer.max_grad_norm=null 'trainer.lr_skd.milestones=[15, 30, 40]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.optimizer.weight_decay=0.0005 trainer.dataloader.batch_size=16\
+                data.dp.time_enc.add_diw=True trainer.loss_fn._target_=torch.nn.HuberLoss ~trainer.loss_fn.name\
+                model.model_params.n_series=358"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=STAEformer data=pems04 trainer/lr_skd=multistep trainer.epochs=300\
+                trainer.max_grad_norm=null 'trainer.lr_skd.milestones=[15, 30, 50]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.optimizer.weight_decay=0.0005 trainer.dataloader.batch_size=16\
+                data.dp.time_enc.add_diw=True trainer.loss_fn._target_=torch.nn.HuberLoss ~trainer.loss_fn.name\
+                model.model_params.n_series=307"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=STAEformer data=pems07 trainer/lr_skd=multistep trainer.epochs=300\
+                trainer.max_grad_norm=null 'trainer.lr_skd.milestones=[15, 35, 50]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.optimizer.lr=0.0005 trainer.optimizer.weight_decay=0.001\
+                trainer.dataloader.batch_size=4 data.dp.time_enc.add_diw=True ~trainer.loss_fn.name\
+                trainer.loss_fn._target_=torch.nn.HuberLoss model.model_params.n_series=883"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=STAEformer data=pems08 trainer/lr_skd=multistep trainer.epochs=300\
+                trainer.max_grad_norm=null 'trainer.lr_skd.milestones=[25, 45, 65]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=30 trainer.optimizer.weight_decay=0.0015 trainer.dataloader.batch_size=16\
+                data.dp.time_enc.add_diw=True trainer.loss_fn._target_=torch.nn.HuberLoss ~trainer.loss_fn.name\
+                model.model_params.n_series=170"
+    elif model == "MegaCRN":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=MegaCRN data=metr_la trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.custom_loss=True 'trainer.lr_skd.milestones=[50, 100]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.optimizer.lr=0.01 trainer.optimizer.weight_decay=0\
+                trainer.optimizer.eps=1e-3 model.model_params.st_params.n_series=207"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=MegaCRN data=pems_bay trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.custom_loss=True 'trainer.lr_skd.milestones=[50, 100]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.optimizer.lr=0.01 trainer.optimizer.weight_decay=0\
+                trainer.optimizer.eps=1e-3 model.model_params.st_params.n_series=325"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=MegaCRN data=pems03 trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.custom_loss=True 'trainer.lr_skd.milestones=[50, 100]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.optimizer.lr=0.01 trainer.optimizer.weight_decay=0\
+                trainer.optimizer.eps=1e-3 model.model_params.st_params.n_series=358"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=MegaCRN data=pems04 trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.custom_loss=True 'trainer.lr_skd.milestones=[50, 100]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.optimizer.lr=0.01 trainer.optimizer.weight_decay=0\
+                trainer.optimizer.eps=1e-3 model.model_params.st_params.n_series=307"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=MegaCRN data=pems07 trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.custom_loss=True 'trainer.lr_skd.milestones=[50, 100]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.optimizer.lr=0.005 trainer.optimizer.weight_decay=0\
+                trainer.optimizer.eps=1e-3 trainer.dataloader.batch_size=32 model.model_params.st_params.n_series=883"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=MegaCRN data=pems08 trainer/lr_skd=multistep trainer.epochs=200\
+                trainer.custom_loss=True 'trainer.lr_skd.milestones=[50, 100]' trainer.lr_skd.gamma=0.1\
+                trainer.es.patience=20 trainer.optimizer.lr=0.01 trainer.optimizer.weight_decay=0\
+                trainer.optimizer.eps=1e-3 model.model_params.st_params.n_series=170"
 
     os.system(cmd)
 

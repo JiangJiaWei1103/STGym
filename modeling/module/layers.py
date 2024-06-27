@@ -13,7 +13,8 @@ from .tconv import TConvBaseModule
 
 from .common_layers import Linear2d, AttentionLayer, GatedFusion
 from .temporal_layers import GatedTCN, DilatedInception, TemporalConvLayer, SCIBlock
-from .spatial_layers import DiffusionConvLayer, ChebGraphConv, InfoPropLayer, STSGCM, NAPLConvLayer
+from .spatial_layers import DiffusionConvLayer, ChebGraphConv, InfoPropLayer, STSGCM, NAPLConvLayer, DynamicMultiHopGCN
+from .gs_learner import DGCRNGSLearner
 
 class DCGRU(nn.Module):
     """Diffusion convolutional gated recurrent unit.
@@ -542,6 +543,112 @@ class GMANAttentionBlock(nn.Module):
         return output
 
 
+class DGCRM(nn.Module):
+    """Dynamic Graph Convolutional Recurrent Module.
+
+    Args:
+        in_dim: input feature dimension
+        h_dim: hidden state dimension
+        gcn_depth: depth of graph convolution
+        alpha: retaining ratio for preserving locality
+        beta: ratio for dynamic gcn
+        gamma: ratio for static gcn
+    """
+
+    def __init__(
+        self, 
+        in_dim: int, 
+        h_dim: int,
+        gcn_depth: int,
+        n_series: int,
+        alpha: float,
+        beta: float,
+        gamma: float,
+        gsl_type: str,
+    ) -> None:
+        super(DGCRM, self).__init__()
+
+        # Network parameters
+        self.h_dim = h_dim
+        self.gsl_type = gsl_type
+        self.node_idx = torch.arange(n_series)
+
+        # Model blocks
+        cat_dim = in_dim + h_dim
+        self.gate = DynamicMultiHopGCN(
+            in_dim=cat_dim, h_dim=h_dim * 2, depth=gcn_depth, alpha=alpha, beta=beta, gamma=gamma
+        )
+        self.gate_t = DynamicMultiHopGCN(
+            in_dim=cat_dim, h_dim=h_dim * 2, depth=gcn_depth, alpha=alpha, beta=beta, gamma=gamma
+        )
+        self.candidate_act = DynamicMultiHopGCN(
+            in_dim=cat_dim, h_dim=h_dim, depth=gcn_depth, alpha=alpha, beta=beta, gamma=gamma
+        )
+        self.candidate_act_t = DynamicMultiHopGCN(
+            in_dim=cat_dim, h_dim=h_dim, depth=gcn_depth, alpha=alpha, beta=beta, gamma=gamma
+        )
+
+    def forward(
+        self, x: Tensor, As: List[Tensor], gs_learner: DGCRNGSLearner, h_0: Optional[Tensor] = None
+    ) -> Tuple[Tensor, Tensor]:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+            As: list of adjacency matrices
+            h_0: initial hidden state
+
+        Returns:
+            output: hidden state for each lookback time step
+            h_n: last hidden state
+
+        Shape:
+            x: (B, L, N, C), where L denotes the input sequence length
+            h_0: (B, N, h_dim)
+            output: (B, L, N, h_dim)
+            h_n: (B, N, h_dim)
+        """
+        in_len = x.shape[1]
+
+        output = []
+        for t in range(in_len):
+            x_t = x[:, t, ...]  # (B, N, C)
+            if t == 0:
+                h_t = None
+                h_prev = self._init_hidden_state(x) if h_0 is None else h_0
+            else:
+                h_prev = h_t
+
+            if self.node_idx.device != x.device:
+                self.node_idx = self.node_idx.to(x.device)
+            A_d, A_dt = gs_learner(self.node_idx, torch.cat([h_prev, x_t], dim=-1), As, self.gsl_type)
+
+            gate = F.sigmoid(
+                self.gate(torch.cat([h_prev, x_t], dim=-1), [A_d, As[0]]) 
+                + self.gate_t(torch.cat([h_prev, x_t], dim=-1), [A_dt, As[1]])
+            )
+            r_t, u_t = torch.split(gate, self.h_dim, dim=-1)  # (B, N, h_dim)
+            c_t = F.tanh(
+                self.candidate_act(torch.cat([r_t * h_prev, x_t], dim=-1), [A_d, As[0]])
+                + self.candidate_act_t(torch.cat([r_t * h_prev, x_t], dim=-1),[A_dt, As[1]])
+            )
+            h_t = u_t * h_prev + (1 - u_t) * c_t  # (B, N, h_dim)
+
+            output.append(h_t.unsqueeze(dim=1))
+        output = torch.cat(output, dim=1)  # (B, L, N, h_dim)
+        h_n = h_t
+
+        return output, h_n
+
+    def _init_hidden_state(self, x: Tensor) -> Tensor:
+        """Initialize the initial hidden state."""
+        batch_size, _, n_series = x.shape[:-1]
+        h_0 = torch.zeros(batch_size, n_series, self.h_dim, device=x.device)
+        nn.init.orthogonal_(h_0)
+
+        return h_0
+
+
 class SCINetTree(nn.Module):
     def __init__(
         self, in_dim: int, h_ratio: int, kernel_size: int, groups: int, dropout: float, INN: bool, current_level: int
@@ -638,3 +745,64 @@ class SCINetTree(nn.Module):
         output = torch.cat(output, dim=0).permute(1, 0, 2)
 
         return  output
+
+
+class STAEAttentionLayer(nn.Module):
+    """Attention Layer of STAEformer.
+
+    Args:
+        in_dim: input feature dimension
+        h_dim: hidden dimension
+        ffl_h_dim: hidden dimension of feed forward layers
+        n_heads: number of parallel attention heads
+        dropout: dropout ratio
+        mask: whether to mask or not
+    """
+
+    def __init__(
+        self, in_dim: int, h_dim: int, ffl_h_dim: int, n_heads: int = 8, dropout: float = 0, mask: bool = False
+    ) -> None:
+        super(STAEAttentionLayer, self).__init__()
+
+        # Model blocks
+        # Attention layer
+        self.attention = AttentionLayer(in_dim=in_dim, h_dim=h_dim, n_heads=n_heads, mask=mask)
+        # Feed forward layer
+        self.ffl = nn.Sequential(
+            nn.Linear(h_dim, ffl_h_dim),
+            nn.ReLU(),
+            nn.Linear(ffl_h_dim, h_dim),
+        )
+
+        self.ln1 = nn.LayerNorm(h_dim)
+        self.ln2 = nn.LayerNorm(h_dim)
+
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+
+    def forward(self, x: Tensor, dim: int = -2) -> Tensor:
+        """Forward pass.
+
+        Args:
+            x: input sequence
+            dim: dimension to perform attention
+
+        Shape:
+            x: (B, L, N, C)
+            out: (B, L, N, C)
+        """
+        x = x.transpose(dim, -2)
+
+        resid = x
+        h = self.attention(x, x, x)
+        h = self.dropout1(h)
+        h = self.ln1(resid + h)
+
+        resid = h
+        h = self.ffl(h)
+        h = self.dropout2(h)
+        h = self.ln2(resid + h)
+
+        output = h.transpose(dim, -2)
+
+        return output
