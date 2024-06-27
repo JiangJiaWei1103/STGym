@@ -120,7 +120,7 @@ class MainTrainer(BaseTrainer):
 
             # Forward pass and derive loss
             with autocast(enabled=self.use_amp):
-                output, *_ = self.model(
+                output, *aux_output = self.model(
                     x,
                     self.priori_gs,
                     ycl=y,
@@ -137,7 +137,7 @@ class MainTrainer(BaseTrainer):
                 # Derive loss
                 if y.dim() == 4:
                     y = y[..., 0]
-                loss = self._get_train_loss(output, y, _)
+                loss = self._get_train_loss(output, y, aux_output)
 
             # Backpropagation
             self.grad_scaler.scale(loss).backward()
