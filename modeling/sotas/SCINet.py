@@ -173,7 +173,7 @@ class SCINet(nn.Module):
         if self.n_stacks == 1:
             return x, None, None
         elif self.n_stacks == 2:
-            MidOutPut = x
+            midoutput = x
             if self.concat_len:
                 x = torch.cat((resid[:, -self.concat_len:,:], x), dim=1)
             else:
@@ -183,7 +183,7 @@ class SCINet(nn.Module):
             x += resid
             x = self.output2(x)
 
-            return x, MidOutPut, None
+            return x, midoutput, None
         
     def get_position_encoding(self, x: Tensor) -> Tensor:
         """Positional encoding.
@@ -237,8 +237,7 @@ class SCINet(nn.Module):
         self,
         y_pred: Tensor,
         y_true: Tensor,
-        Midoutput: Tensor,
-        output2: Union[Tensor, None],
+        aux_output: List[Tensor],
         scaler: Union[MaxScaler, StandardScaler],
         criterion: _Loss,
     ) -> float:
@@ -247,8 +246,7 @@ class SCINet(nn.Module):
         Args:
             y_pred: model prediction
             y_true: ground truth
-            output1: Mid Output or None
-            output2: None
+            aux_output: auxiliary output
             scaler: scaler
         """
         if self.criterion is None:
@@ -256,25 +254,26 @@ class SCINet(nn.Module):
             
         weight = torch.tensor(self.lastWeight).to(y_pred.device)
 
-        if Midoutput is not None:
-            Midoutput = scaler.inverse_transform(Midoutput)
+        midoutput = aux_output[0]
+        if midoutput is not None:
+            midoutput = scaler.inverse_transform(midoutput)
 
         if self.single_step:
             y_last = y_true[:, -1, :]
             loss_f = self.criterion(y_pred[:, -1, :], y_last)
             if self.n_stacks == 2:
-                loss_m = self.criterion(Midoutput, y_true) / Midoutput.shape[1] # average results
+                loss_m = self.criterion(midoutput, y_true) / midoutput.shape[1] # average results
         else:
             if self.lastWeight == 1.0:
                 loss_f = self.criterion(y_pred, y_true)
                 if self.n_stacks == 2:
-                    loss_m = self.criterion(Midoutput, y_true)
+                    loss_m = self.criterion(midoutput, y_true)
             else:
                 loss_f = self.criterion(y_pred[:, :-1, :], y_true[:, :-1, :] ) \
                         + weight * self.criterion(y_pred[:, -1:, :], y_true[:, -1:, :] )
                 if self.n_stacks == 2:
-                    loss_m = self.criterion(Midoutput[:, :-1, :] , y_true[:, :-1, :] ) \
-                            + weight * self.criterion(Midoutput[:, -1:, :], y_true[:, -1:, :])
+                    loss_m = self.criterion(midoutput[:, :-1, :] , y_true[:, :-1, :] ) \
+                            + weight * self.criterion(midoutput[:, -1:, :], y_true[:, -1:, :])
                     
         loss = loss_f
         if self.n_stacks == 2:
@@ -286,8 +285,7 @@ class SCINet(nn.Module):
         self,
         y_pred: Tensor,
         y_true: Tensor,
-        Midoutput: Tensor,
-        output2: Union[Tensor, None],
+        aux_output: List[Tensor],
         scaler: Union[MaxScaler, StandardScaler],
         criterion: _Loss,
     ) -> Tuple[float, Tensor, Tensor]:
@@ -296,15 +294,15 @@ class SCINet(nn.Module):
         Args:
             y_pred: model prediction
             y_true: ground truth
-            output1: Mid Output
-            output2: None
+            aux_output: auxiliary output
             scaler: scaler
             criterion: criterion
         """
         y_pred_inv = scaler.inverse_transform(y_pred)
         y_true_inv = scaler.inverse_transform(y_true)
-        if Midoutput is not None:
-            Midoutput = scaler.inverse_transform(Midoutput)
+        midoutput = aux_output[0]
+        if midoutput is not None:
+            midoutput = scaler.inverse_transform(midoutput)
 
         if self.dataset_name in MTSFBerks:
             y_pred = y_pred[:, -1, :]

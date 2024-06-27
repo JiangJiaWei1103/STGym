@@ -120,7 +120,14 @@ class MainTrainer(BaseTrainer):
 
             # Forward pass and derive loss
             with autocast(enabled=self.use_amp):
-                output, *_ = self.model(x, self.priori_gs, ycl=y, iteration=self._iter, aux_data=self.aux_data)
+                output, *_ = self.model(
+                    x,
+                    self.priori_gs,
+                    ycl=y,
+                    iteration=self._iter,
+                    aux_data=self.aux_data,
+                    task_level=None if self._cl is None else self._cl.get_task_lv(),
+                )
 
                 # Inverse transform to the original scale
                 if self.rescale:
@@ -184,12 +191,12 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
 
             # Forward pass
-            output, *_ = self.model(x, self.priori_gs, ycl=y, aux_data=self.aux_data)
+            output, *aux_output = self.model(x, self.priori_gs, ycl=y, aux_data=self.aux_data)
 
             # Derive loss
             if y.dim() == 4:
                 y = y[..., 0]
-            loss, output, y = self._get_eval_loss(output, y, _)
+            loss, output, y = self._get_eval_loss(output, y, aux_output)
             eval_loss_total += loss.item()
 
             # Record batched output
@@ -215,14 +222,14 @@ class MainTrainer(BaseTrainer):
         else:
             return eval_loss_avg, eval_result, None
     
-    def _get_train_loss(self, output: Tensor, y: Tensor, mid_output: List[Tensor]) -> float:
+    def _get_train_loss(self, output: Tensor, y: Tensor, aux_output: List[Tensor]) -> float:
         """Get training loss.
 
         Returns:
             loss: training loss
         """
         if self.custom_loss:
-            loss = self.model.train_loss(output, y, mid_output, self.scaler, self.loss_fn)
+            loss = self.model.train_loss(output, y, aux_output, self.scaler, self.loss_fn)
         elif self._cl is not None:
             task_lv = self._cl.get_task_lv()
             loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
@@ -232,7 +239,7 @@ class MainTrainer(BaseTrainer):
 
         return loss
     
-    def _get_eval_loss(self, output: Tensor, y: Tensor, mid_output: List[Tensor]) -> Tuple[float, Tensor, Tensor]:
+    def _get_eval_loss(self, output: Tensor, y: Tensor, aux_output: List[Tensor]) -> Tuple[float, Tensor, Tensor]:
         """Get evaluation loss.
 
         Returns:
@@ -242,7 +249,7 @@ class MainTrainer(BaseTrainer):
 
         """
         if self.custom_loss:
-            loss, output, y = self.model.eval_loss(output, y, mid_output, self.scaler, self.loss_fn)
+            loss, output, y = self.model.eval_loss(output, y, aux_output, self.scaler, self.loss_fn)
         elif self.rescale:
             loss = self.loss_fn(
                 self.scaler.inverse_transform(output),
