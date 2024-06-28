@@ -1,26 +1,26 @@
 """
-Baseline method, DCRNN [ICLR, 2018].
-Author: JiaWei Jiang, ChunWei Shen
+Baseline method, GTS [ICLR, 2021].
+Author: ChunWei Shen
 
 Reference:
-* Paper: https://arxiv.org/abs/1707.01926
-* Code:
-    * https://github.com/liyaguang/DCRNN
-    * https://github.com/xlwang233/pytorch-DCRNN
+* Paper: https://arxiv.org/abs/2101.06861
+* Code: https://github.com/chaoshangcs/GTS
 """
 import random
-import numpy as np
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
 
+from utils.scaler import StandardScaler
 from modeling.module.layers import DCGRU
+from modeling.module.gs_learner import GTSGSLearner
 
 
-class DCRNN(nn.Module):
-    """DCRNN framework.
+class GTS(nn.Module):
+    """GTS framework.
 
     Args:
         n_layers: number of DCRNN layers
@@ -33,12 +33,22 @@ class DCRNN(nn.Module):
         use_curriculum_learning: if True, model is trained with
             scheduled sampling
         cl_decay_steps: control the decay rate of cl threshold
+        train_ratio: training data ratio
+        dataset_name: dataset name
+        temperature: non-negative scalar for gumbel softmax
+        n_series: number of series
         out_len: output sequence length
     """
 
-    def __init__(self, st_params: Dict[str, Any], out_len: int) -> None:
+    def __init__(
+        self, 
+        n_series: int,
+        out_len: int, 
+        st_params: Dict[str, Any], 
+        gsl_params: Dict[str, Any],
+    ) -> None:
         self.name = self.__class__.__name__
-        super(DCRNN, self).__init__()
+        super(GTS, self).__init__()
 
         # Network parameters
         # Spatio-temporal pattern extractor
@@ -53,8 +63,14 @@ class DCRNN(nn.Module):
         # Curriculum learning strategy, scheduled sampling
         self.use_curriculum_learning = self.st_params["use_curriculum_learning"]
         self.cl_decay_steps = self.st_params["cl_decay_steps"]
+        # hyperparameters of Graph structure learner
+        fc_in_dim = gsl_params["fc_in_dim"]
+        self.train_ratio = gsl_params["train_ratio"]
+        temperature= gsl_params["temperature"]
 
         # Model blocks
+        # Graph structure learner
+        self.gs_learner = GTSGSLearner(fc_in_dim=fc_in_dim, n_series=n_series, temperature=temperature)
         # Encoder
         self.encoder = _Encoder(
             in_dim=enc_in_dim,
@@ -75,12 +91,7 @@ class DCRNN(nn.Module):
         )
 
     def forward(
-        self, 
-        x: Tensor, 
-        As: List[Tensor], 
-        ycl: Optional[Tensor] = None, 
-        iteration: Optional[int] = None, 
-        **kwargs: Any,
+        self, x: Tensor, As: List[Tensor], ycl: Tensor, aux_data: np.ndarray, **kwargs: Any
     ) -> Tuple[Tensor, None, None]:
         """Forward pass.
 
@@ -92,20 +103,20 @@ class DCRNN(nn.Module):
 
         Shape:
             x: (B, P, N, C)
-            As: each A with shape (2, |E|), where |E| denotes the
-                number edges
             ycl: (B, Q, N, C)
             output: (B, Q, N)
         """
+        node_features = self._node_features_preprocess(self.train_ratio, aux_data[0]).to(x.device)
+        A = self.gs_learner(node_features)
         # Encoder
-        hs = self.encoder(x, As)  # (n_layers, B, N, h_dim)
+        hs = self.encoder(x, [A])  # (n_layers, B, N, h_dim)
 
         # Decoder
         if self.training and self.use_curriculum_learning:
-            teacher_forcing_ratio = self._compute_sampling_threshold(iteration)
+            teacher_forcing_ratio = self._compute_sampling_threshold(kwargs["iteration"])
         else:
             teacher_forcing_ratio = 0
-        output = self.decoder(hs, As, ycl, teacher_forcing_ratio)  # (B, Q, N)
+        output = self.decoder(hs, [A], ycl, teacher_forcing_ratio)  # (B, Q, N)
 
         return output, None, None
 
@@ -114,11 +125,26 @@ class DCRNN(nn.Module):
         thres = self.cl_decay_steps / (self.cl_decay_steps + np.exp(iteration / self.cl_decay_steps))
 
         return thres
+    
+    def _node_features_preprocess(self, train_ratio: float, aux_data: np.ndarray) -> Tensor:
+        """Node features preprocess."""
+        try:
+            data_vals = aux_data["data"][..., 0]
+        except:
+            data_vals = aux_data
+        num_samples = data_vals.shape[0]
+        num_train = round(num_samples * train_ratio)
+        data_vals = data_vals[:num_train]
+        scaler = StandardScaler()
+        train_features = scaler.fit_transform(data_vals)
+        train_features = torch.Tensor(train_features)
+
+        return train_features
 
 
 class _Encoder(nn.Module):
     """DCRNN encoder."""
-    
+
     def __init__(self, in_dim: int, h_dim: int, n_layers: int, n_adjs: int = 2, max_diffusion_step: int = 2) -> None:
         super(_Encoder, self).__init__()
 
@@ -142,8 +168,6 @@ class _Encoder(nn.Module):
 
         Shape:
             x: (B, P, N, C)
-            As: each A with shape (2, |E|), where |E| denotes the
-                number edges
             hs: (n_layers, B, N, h_dim)
         """
         hs = []
@@ -197,8 +221,6 @@ class _Decoder(nn.Module):
 
         Shape:
             hs: (n_layers, B, N, h_dim)
-            As: each A with shape (2, |E|), where |E| denotes the
-                number edges
             ycl: (B, Q, N, h_dim)
             output: (B, Q, N)
         """

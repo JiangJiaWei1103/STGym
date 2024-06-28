@@ -6,16 +6,18 @@ Definitions of diversified trainers, whose core training logics are
 inherited from `BaseTrainer`.
 
 * [ ] Pack input data in Dict.
-* [ ] Fuse grad clipping mechanism into solver.
+* [x] Fuse grad clipping mechanism into solver.
+    * Set max_grad_norm as an attribute of `BaseTrainer`.
 """
 import gc
-import numpy as np
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
 import torch
 from torch import Tensor
+from torch.cuda.amp import GradScaler, autocast
 from torch.nn import Module
 from torch.nn.modules.loss import _Loss
 from torch.optim import Optimizer, lr_scheduler
@@ -85,17 +87,19 @@ class MainTrainer(BaseTrainer):
         self.train_loader = train_loader
         self.eval_loader = eval_loader if eval_loader else train_loader
         self.priori_gs = None if priori_gs is None else [A.to(self.device) for A in priori_gs]
-        self.aux_data = None if aux_data is None else [data.to(self.device) for data in aux_data]
+        self.aux_data = None if aux_data is None else aux_data
         self.scaler = scaler
-        # self.rescale = proc_cfg["loss_fn"]["rescale"]
-        self.rescale = True
+        self.rescale = proc_cfg["rescale"]
+        self.custom_loss = proc_cfg["custom_loss"]
 
         # Curriculum learning
-        # if self.proc_cfg["loss_fn"]["cl"] is not None:
-        #     self._cl = CLTracker(**self.proc_cfg["loss_fn"]["cl"])
-        # else:
-        #     self._cl = None
-        self._cl = None
+        if self.proc_cfg["cl"] is not None:
+            self._cl = CLTracker(**self.proc_cfg["cl"])
+        else:
+            self._cl = None
+
+        # Mixed precision training
+        self.grad_scaler = GradScaler(enabled=self.use_amp)
 
     def _train_epoch(self) -> float:
         """Run training process for one epoch.
@@ -115,32 +119,38 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
 
             # Forward pass and derive loss
-            output, *_ = self.model(x, self.priori_gs, ycl=y, iteration=self._iter, aux_data=self.aux_data)
+            with autocast(enabled=self.use_amp):
+                output, *aux_output = self.model(
+                    x,
+                    self.priori_gs,
+                    ycl=y,
+                    iteration=self._iter,
+                    aux_data=self.aux_data,
+                    task_level=None if self._cl is None else self._cl.get_task_lv(),
+                )
 
-            # Inverse transform to the original scale
-            if self.rescale:
-                output = self.scaler.inverse_transform(output)
-                y = self.scaler.inverse_transform(y)
+                # Inverse transform to the original scale
+                if self.rescale:
+                    output = self.scaler.inverse_transform(output)
+                    y = self.scaler.inverse_transform(y)
 
-            # Derive loss
-            if y.dim() == 4:
-                y = y[..., 0]
-            if self._cl is not None:
-                task_lv = self._cl.get_task_lv()
-                loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
-                self._cl.step()
-            else:
-                loss = self.loss_fn(output, y)
+                # Derive loss
+                if y.dim() == 4:
+                    y = y[..., 0]
+                loss = self._get_train_loss(output, y, aux_output)
 
             # Backpropagation
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5)
+            self.grad_scaler.scale(loss).backward()
+            if self.max_grad_norm is not None:
+                self.grad_scaler.unscale_(self.optimizer)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+            self.grad_scaler.step(self.optimizer)  # Auto unscale
+            self.grad_scaler.update()
 
-            self.optimizer.step()
             self._iter += 1
             train_loss_total += loss.item()
 
-            if self.step_per_batch:
+            if self.batch_scheduler:
                 self.lr_skd.step()
 
             # Free mem.
@@ -181,18 +191,12 @@ class MainTrainer(BaseTrainer):
             y = batch_data["y"].to(self.device)
 
             # Forward pass
-            output, *_ = self.model(x, self.priori_gs, ycl=y, aux_data=self.aux_data)
+            output, *aux_output = self.model(x, self.priori_gs, ycl=y, aux_data=self.aux_data)
 
             # Derive loss
             if y.dim() == 4:
                 y = y[..., 0]
-            if self.rescale:
-                loss = self.loss_fn(
-                    self.scaler.inverse_transform(output),
-                    self.scaler.inverse_transform(y),
-                )
-            else:
-                loss = self.loss_fn(output, y)
+            loss, output, y = self._get_eval_loss(output, y, aux_output)
             eval_loss_total += loss.item()
 
             # Record batched output
@@ -217,6 +221,44 @@ class MainTrainer(BaseTrainer):
             return eval_loss_avg, eval_result, y_pred
         else:
             return eval_loss_avg, eval_result, None
+    
+    def _get_train_loss(self, output: Tensor, y: Tensor, aux_output: List[Tensor]) -> float:
+        """Get training loss.
+
+        Returns:
+            loss: training loss
+        """
+        if self.custom_loss:
+            loss = self.model.train_loss(output, y, aux_output, self.scaler, self.loss_fn)
+        elif self._cl is not None:
+            task_lv = self._cl.get_task_lv()
+            loss = self.loss_fn(output[:, :task_lv, :], y[:, :task_lv, :])
+            self._cl.step()
+        else:
+            loss = self.loss_fn(output, y)
+
+        return loss
+    
+    def _get_eval_loss(self, output: Tensor, y: Tensor, aux_output: List[Tensor]) -> Tuple[float, Tensor, Tensor]:
+        """Get evaluation loss.
+
+        Returns:
+            loss: evaluation loss
+            output: inference result
+            y: ground truth
+
+        """
+        if self.custom_loss:
+            loss, output, y = self.model.eval_loss(output, y, aux_output, self.scaler, self.loss_fn)
+        elif self.rescale:
+            loss = self.loss_fn(
+                self.scaler.inverse_transform(output),
+                self.scaler.inverse_transform(y),
+            )
+        else:
+            loss = self.loss_fn(output, y)
+
+        return loss, output, y
 
 
 class CLTracker(object):

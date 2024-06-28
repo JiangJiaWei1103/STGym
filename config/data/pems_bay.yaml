@@ -1,10 +1,10 @@
-# data/pems03
+# data/pems_bay
 
 # ==Data Processing==
 dp:
-    dataset_name: pems03
-    data_path: ${paths.RAW_DATA_PATH}/pems03/pems03.npz
-    adj_path: ${paths.RAW_DATA_PATH}/pems03/pems03_adj.pkl
+    dataset_name: pems_bay
+    data_path: ${paths.RAW_DATA_PATH}/pems_bay/pems_bay.h5
+    adj_path: ${paths.RAW_DATA_PATH}/pems_bay/pems_bay_adj.pkl
     aux_data_path: null
     # Holdout test ratio
     holdout_ratio: 0.2
@@ -24,8 +24,8 @@ dp:
 # == CV Scheme ==
 cv:
     _target_: cv.ts.TSSplit
-    train_ratio: 0.75
-    val_ratio: 0.25
+    train_ratio: 0.875
+    val_ratio: 0.125
 
 # == Dataset (PyTorch) ==
 dataset:

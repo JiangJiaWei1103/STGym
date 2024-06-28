@@ -14,10 +14,12 @@ project_name: Demo
 # Experiment identifier
 exp_id: null
 # Number of random seeds for running experiments with the same setup
-n_seeds: 2
+n_seeds: 5
 # Random seed, currently picked automatically
 seed: null
 # If True, use wandb to track training and evaluation processes
 use_wandb: False
 # If True, the experiment stops after one fold of CV is done
 one_fold_only: True
+# If True, evaluate on test set
+eval_on_test: True

@@ -26,6 +26,7 @@ from data.data_processor import DataProcessor
 from experiment.experiment import Experiment
 from trainer.trainer import MainTrainer
 from utils.common import count_params
+from utils.early_stopping import EarlyStopping
 
 warnings.simplefilter("ignore")
 
@@ -102,7 +103,9 @@ def main(cfg: DictConfig) -> None:
                 optimizer = opt_partial(params=model.parameters())
                 # LR scheduler
                 lr_skd_partial = instantiate(exp.trainer_cfg["lr_skd"])
-                if HydraConfig.get().runtime.choices["trainer/lr_skd"] == "cos":
+                if lr_skd_partial is None:
+                    lr_skd = None
+                elif HydraConfig.get().runtime.choices["trainer/lr_skd"] == "cos":
                     num_training_steps = (
                         math.ceil(
                             len(train_loader.dataset)
@@ -114,6 +117,12 @@ def main(cfg: DictConfig) -> None:
                     lr_skd = lr_skd_partial(optimizer=optimizer, T_max=num_training_steps)
                 else:
                     lr_skd = lr_skd_partial(optimizer=optimizer)
+
+                # Build early stopping tracker
+                if exp.trainer_cfg["es"]["patience"] != 0:
+                    es = EarlyStopping(exp.trainer_cfg["es"]["patience"], exp.trainer_cfg["es"]["mode"])
+                else:
+                    es = None
 
                 # Build evaluator
                 evaluator = instantiate(exp.trainer_cfg["evaluator"])
@@ -127,7 +136,7 @@ def main(cfg: DictConfig) -> None:
                     loss_fn=loss_fn,
                     optimizer=optimizer,
                     lr_skd=lr_skd,
-                    es=None,
+                    es=es,
                     ckpt_path=exp.ckpt_path,
                     evaluator=evaluator,
                     scaler=scaler,
@@ -135,22 +144,19 @@ def main(cfg: DictConfig) -> None:
                     eval_loader=val_loader,
                     use_wandb=exp.cfg["use_wandb"],
                     priori_gs=priori_gs,
-                    aux_data=aux_data
+                    aux_data=aux_data,
                 )
 
                 # Run main training and evaluation for one fold
                 trainer.train_eval(proc_id)
 
                 # Run evaluation on unseen test set
-                if False:
-                    # ===
-                    # Recover test...
+                if exp.cfg["eval_on_test"]:
                     data_test = dp.get_data_test()
                     test_loader = build_dataloader(
                         data_test, "test", exp.data_cfg["dataset"], **exp.trainer_cfg["dataloader"]
                     )
                     _ = trainer.test(fold, test_loader)
-                    # ===
 
                 # Dump output objects
                 if scaler is not None:

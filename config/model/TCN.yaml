@@ -1,0 +1,19 @@
+# model/TCN
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.TCN.TCN
+    # Spatio-temporal pattern extractor
+    st_params:
+        n_layers: 3
+        tcn_h_dim: 64
+        kernel_size: 2
+        dilation_exponential: 2
+        dropout: 0.2
+    in_dim: 2
+    skip_dim: 64
+    end_dim: 128
+    in_len: 12
+    out_len: 12
+
+fit_params:

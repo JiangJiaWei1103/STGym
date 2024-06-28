@@ -1,0 +1,31 @@
+# model/GWNet
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.GWNet.GWNet
+    # Spatial/Temporal Convolution Module
+    st_params:
+        n_layers: 8
+        tcn_in_dim: 32
+        gcn_in_dim: 32
+        kernel_size: 2
+        dilation_factor:
+            - 1
+            - 2
+            - 1
+            - 2
+            - 1
+            - 2
+            - 1
+            - 2
+        n_adjs: 3
+        gcn_depth: 2
+        gcn_dropout: 0.3
+        bn: True
+    in_dim: 2
+    skip_dim: 256
+    end_dim: 512
+    out_len: 12
+    n_series: 207
+
+fit_params:

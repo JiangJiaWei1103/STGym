@@ -1,10 +1,10 @@
-# data/pems03
+# data/pems04
 
 # ==Data Processing==
 dp:
-    dataset_name: pems03
-    data_path: ${paths.RAW_DATA_PATH}/pems03/pems03.npz
-    adj_path: ${paths.RAW_DATA_PATH}/pems03/pems03_adj.pkl
+    dataset_name: pems04
+    data_path: ${paths.RAW_DATA_PATH}/pems04/pems04.npz
+    adj_path: ${paths.RAW_DATA_PATH}/pems04/pems04_adj.pkl
     aux_data_path: null
     # Holdout test ratio
     holdout_ratio: 0.2

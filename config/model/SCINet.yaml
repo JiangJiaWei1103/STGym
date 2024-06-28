@@ -1,0 +1,26 @@
+# model/SCINet
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.SCINet.SCINet
+    # Spatial/Temporal pattern extractor
+    st_params:
+        n_stacks: 1
+        n_levels: 2
+        n_decoder_layer: 2
+        h_ratio: 0.0625
+        kernel_size: 5
+        groups: 1
+        dropout: 0.25
+        INN: True
+        positional_ecoding: True
+        dataset_name: metr_la
+    loss_params:
+        single_step: 0
+        lastWeight: 1.0
+        criterion: null
+    in_len: 12
+    out_len: 12
+    n_series: 207
+
+fit_params:

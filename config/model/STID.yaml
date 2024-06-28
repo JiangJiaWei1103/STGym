@@ -1,0 +1,19 @@
+# model/STID
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.STID.STID
+    # Spatial/Temporal pattern extractor
+    st_params:
+        n_layers: 3
+        lin_h_dim: 32
+        node_emb_dim: 32
+        tid_emb_dim: 32
+        diw_emb_dim: 32
+        n_tids: 288
+    in_dim: 3
+    in_len: 12
+    out_len: 12
+    n_series: 207
+
+fit_params:
