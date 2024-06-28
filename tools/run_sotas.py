@@ -13,7 +13,33 @@ model = args.model
 data = args.data
 
 def main():
-    if model == "DCRNN":
+    if model == "LSTM":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=LSTM data=metr_la trainer.lr_skd=null"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=LSTM data=pems_bay trainer.lr_skd=null"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=LSTM data=pems03 trainer.lr_skd=null"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=LSTM data=pems04 trainer.lr_skd=null"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=LSTM data=pems07 trainer.lr_skd=null"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=LSTM data=pems08 trainer.lr_skd=null"
+    elif model == "TCN":
+        if data == "metr_la":
+            cmd = "python -m tools.main model=TCN data=metr_la trainer.lr_skd=null"
+        elif data == "pems_bay":
+            cmd = "python -m tools.main model=TCN data=pems_bay trainer.lr_skd=null"
+        elif data == "pems03":
+            cmd = "python -m tools.main model=TCN data=pems03 trainer.lr_skd=null"
+        elif data == "pems04":
+            cmd = "python -m tools.main model=TCN data=pems04 trainer.lr_skd=null"
+        elif data == "pems07":
+            cmd = "python -m tools.main model=TCN data=pems07 trainer.lr_skd=null"
+        elif data == "pems08":
+            cmd = "python -m tools.main model=TCN data=pems08 trainer.lr_skd=null"
+    elif model == "DCRNN":
         if data == "metr_la":
             cmd = "python -m tools.main model=DCRNN data=metr_la trainer/lr_skd=multistep\
                 'trainer.lr_skd.milestones=[20, 30, 40, 50]' trainer.lr_skd.gamma=0.1 trainer.optimizer.lr=0.01\

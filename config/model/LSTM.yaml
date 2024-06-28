@@ -1,0 +1,16 @@
+# model/LSTM
+
+# == Model Hyperparameters ==
+model_params:
+    _target_: modeling.sotas.LSTM.LSTM
+    # Spatio-temporal pattern extractor
+    st_params:
+        n_layers: 1
+        lin_h_dim: 64
+        rnn_h_dim: 64
+        rnn_dropout: 0
+    in_dim: 2
+    end_dim: 512
+    out_len: 12
+
+fit_params:
