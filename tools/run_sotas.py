@@ -143,8 +143,8 @@ def main():
                 'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=2500 +trainer.cl.task_lv_max=12\
                 data.dp.priori_gs.type=dbl_transition model.model_params.gsl_params.n_series=207"
         elif data == "pems_bay":
-            cmd = "python -m tools.main model=DGCRN data=pems_bay trainer/lr_skd=multistep trainer.epochs=150\
-                'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=6500 +trainer.cl.task_lv_max=12\
+            cmd = "python -m tools.main model=DGCRN data=pems_bay trainer/lr_skd=multistep trainer.epochs=110\
+                'trainer.lr_skd.milestones=[100]' +trainer.cl.lv_up_period=6500 +trainer.cl.task_lv_max=12\
                 trainer.dataloader.batch_size=32 data.dp.priori_gs.type=dbl_transition\
                 model.model_params.st_params.h_dim=96 model.model_params.st_params.cl_decay_steps=5500\
                 model.model_params.gsl_params.n_series=325"
@@ -160,11 +160,11 @@ def main():
                 model.model_params.gsl_params.n_series=307"
         elif data == "pems07":
             cmd = "python -m tools.main model=DGCRN data=pems07 trainer/lr_skd=multistep trainer.epochs=150\
-                'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=8500 +trainer.cl.task_lv_max=12\
-                trainer.dataloader.batch_size=12 data.dp.priori_gs.type=dbl_transition\
+                'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=3000 +trainer.cl.task_lv_max=12\
+                trainer.dataloader.batch_size=32 data.dp.priori_gs.type=dbl_transition\
                 model.model_params.gsl_params.n_series=883"
         elif data == "pems08":
-            cmd = "python -m tools.main model=DGCRN data=pems07 trainer/lr_skd=multistep trainer.epochs=150\
+            cmd = "python -m tools.main model=DGCRN data=pems08 trainer/lr_skd=multistep trainer.epochs=150\
                 'trainer.lr_skd.milestones=[100, 120]' +trainer.cl.lv_up_period=1500 +trainer.cl.task_lv_max=12\
                 trainer.dataloader.batch_size=32 data.dp.priori_gs.type=dbl_transition\
                 model.model_params.gsl_params.n_series=170"
