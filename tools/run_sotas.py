@@ -172,27 +172,27 @@ def main():
         if data == "metr_la":
             cmd = "python -m tools.main model=STSGCN data=metr_la trainer/lr_skd=multistep trainer.es.patience=30\
                 'trainer.lr_skd.milestones=[50, 80]' trainer.dataloader.batch_size=32 data.dp.time_enc.add_tid=False\
-                 data.dp.priori_gs.type=binary model.model_params.st_params.n_series=207"
+                data.dp.priori_gs.type=binary model.model_params.st_params.n_series=207"
         elif data == "pems_bay":
             cmd = "python -m tools.main model=STSGCN data=pems_bay trainer/lr_skd=multistep trainer.es.patience=30\
                 'trainer.lr_skd.milestones=[50, 80]' trainer.dataloader.batch_size=32 data.dp.time_enc.add_tid=False\
-                 data.dp.priori_gs.type=binary model.model_params.st_params.n_series=325"
+                data.dp.priori_gs.type=binary model.model_params.st_params.n_series=325"
         elif data == "pems03":
             cmd = "python -m tools.main model=STSGCN data=pems03 trainer/lr_skd=multistep trainer.es.patience=30\
                 'trainer.lr_skd.milestones=[50, 80]' trainer.dataloader.batch_size=16 data.dp.time_enc.add_tid=False\
-                 data.dp.priori_gs.type=binary model.model_params.st_params.n_series=358"
+                data.dp.priori_gs.type=binary model.model_params.st_params.n_series=358"
         elif data == "pems04":
             cmd = "python -m tools.main model=STSGCN data=pems04 trainer/lr_skd=multistep trainer.es.patience=30\
                 'trainer.lr_skd.milestones=[50, 80]' trainer.dataloader.batch_size=32 data.dp.time_enc.add_tid=False\
-                 data.dp.priori_gs.type=binary model.model_params.st_params.n_series=307"
+                data.dp.priori_gs.type=binary model.model_params.st_params.n_series=307"
         elif data == "pems07":
             cmd = "python -m tools.main model=STSGCN data=pems07 trainer/lr_skd=multistep trainer.es.patience=30\
                 'trainer.lr_skd.milestones=[50, 80]' trainer.dataloader.batch_size=16 data.dp.time_enc.add_tid=False\
-                 data.dp.priori_gs.type=binary model.model_params.st_params.n_series=883"
+                data.dp.priori_gs.type=binary model.model_params.st_params.n_series=883"
         elif data == "pems08":
             cmd = "python -m tools.main model=STSGCN data=pems08 trainer/lr_skd=multistep trainer.es.patience=30\
                 'trainer.lr_skd.milestones=[50, 80]' trainer.dataloader.batch_size=32 data.dp.time_enc.add_tid=False\
-                 data.dp.priori_gs.type=binary model.model_params.st_params.n_series=170"
+                data.dp.priori_gs.type=binary model.model_params.st_params.n_series=170"
     elif model == "AGCRN":
         if data == "metr_la":
             cmd = "python -m tools.main model=AGCRN data=metr_la trainer/lr_skd=multistep trainer.es.patience=30\
