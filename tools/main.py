@@ -158,6 +158,8 @@ def main(cfg: DictConfig) -> None:
                     )
                     _ = trainer.test(fold, test_loader)
 
+                trainer.profiler.summarize(log_wnb=True if exp.cfg["use_wandb"] else False)
+
                 # Dump output objects
                 if scaler is not None:
                     exp.dump_trafo(scaler, f"scaler_{proc_id}")
