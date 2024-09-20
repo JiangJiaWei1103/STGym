@@ -1,0 +1,12 @@
+gensim
+hydra-core
+networkx
+numpy
+omegaconf
+pandas
+rich
+scikit_learn
+scipy
+tables
+tqdm
+wandb
