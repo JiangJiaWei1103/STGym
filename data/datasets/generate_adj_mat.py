@@ -2,48 +2,12 @@
 Script for generating adjacency matrix.
 Author: ChunWei Shen
 """
-from typing import List, Dict, Tuple
+from typing import Tuple
 
 import csv
 import pickle
-import argparse
 import numpy as np
-import pandas as pd
 from metadata import N_SERIES
-
-def gen_distance_adj_mat(
-    distance_df: pd.DataFrame, sensor_ids: List[str], normalized_k: float = 0.1,
-) -> Tuple[List[str], Dict[str, int], np.ndarray]:
-    """
-    Args:
-        distance_df: data frame with three columns: [from, to, distance]
-        sensor_ids: list of sensor ids
-        normalized_k: entries that become lower than normalized_k after normalization are set to zero for sparsity
-    """
-    n_sensors = len(sensor_ids)
-    dist_mat = np.zeros((n_sensors, n_sensors), dtype=np.float32)
-    dist_mat[:] = np.inf
-
-    # Builds sensor id to index map
-    sensor_id_to_idx = {}
-    for i, sensor_id in enumerate(sensor_ids):
-        sensor_id_to_idx[sensor_id] = i
-
-    # Fills cells in the matrix with distances
-    for row in distance_df.values:
-        if row[0] not in sensor_id_to_idx or row[1] not in sensor_id_to_idx:
-            continue
-        dist_mat[sensor_id_to_idx[row[0]], sensor_id_to_idx[row[1]]] = row[2]
-
-    # Calculates the standard deviation as theta
-    distances = dist_mat[~np.isinf(dist_mat)].flatten()
-    std = distances.std()
-    adj_mat = np.exp(-np.square(dist_mat / std))
-
-    # Sets entries that lower than a threshold, i.e., k, to zero for sparsity
-    adj_mat[adj_mat < normalized_k] = 0
-
-    return sensor_ids, sensor_id_to_idx, adj_mat
 
 def gen_binary_adj_mat(
     distance_df_filepath: str, n_series: int, sensor_ids_filepath: str = None
@@ -90,31 +54,34 @@ def gen_binary_adj_mat(
                 dist_adj[j, i] = distance
 
         return binary_adj, dist_adj
+    
+def gen_and_save_adj(dataset_name: str):
+    """
+    Args:
+        dataset_name: dataset name
+    """
+    print(f"Generating {dataset_name} Adjacency Matrix ...")
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset_name", type=str, default="metr_la")
-    parser.add_argument("--sensor_ids_filepath", type=str, default="./data/raw/metr_la/graph_sensor_ids.txt", 
-                        help="file containing sensor ids separated by comma")
-    parser.add_argument("--distances_filepath", type=str, default="./data/raw/metr_la/distances_la_2012.csv", 
-                        help="csv file containing sensor distances")
-    parser.add_argument("--normalized_k", type=float, default=0.1, help="normalization for sparsity")
-    parser.add_argument("--output_pkl_filepath", type=str, default="./data/raw/metr_la/metr_la_adj_test.pkl", 
-                        help="path of the output file")
-    args = parser.parse_args()
+    if dataset_name == "pems03":
+        sensor_ids_filepath = f"./data/raw/{dataset_name}/{dataset_name}.txt"
+    else:
+        sensor_ids_filepath = None
+    
+    binary_adj, dist_adj = gen_binary_adj_mat(
+        distance_df_filepath=f"./data/raw/{dataset_name}/{dataset_name}.csv", 
+        n_series=N_SERIES[dataset_name], 
+        sensor_ids_filepath=sensor_ids_filepath,
+    )
 
-    if args.dataset_name == "metr_la":
-        with open(args.sensor_ids_filepath) as f:
-            sensor_ids = f.read().strip().split(",")
-        distance_df = pd.read_csv(args.distances_filepath, dtype={"from": "str", "to": "str"})
-        normalized_k = args.normalized_k
-        _, sensor_id_to_ind, adj_mat = gen_distance_adj_mat(distance_df, sensor_ids, normalized_k)
-        # Save to pickle file
-        with open(args.output_pkl_filepath, "wb") as f:
-            pickle.dump(adj_mat, f, protocol=2)
-    elif args.dataset_name in ["pems03", "pems04", "pems07", "pems08"]:
-        n_series = N_SERIES[args.dataset_name]
-        binary_adj, dist_adj = gen_binary_adj_mat(args.distances_filepath, n_series, args.sensor_ids_filepath)
-        # Save to pickle file
-        with open(args.output_pkl_filepath, "wb") as f:
-            pickle.dump(binary_adj, f, protocol=2)
+    with open(f"./data/raw/{dataset_name}/{dataset_name}_adj.pkl", "wb") as f:
+        pickle.dump(binary_adj, f, protocol=2)
+
+    print("Finish!")
+
+    return
+
+if __name__ == "__main__":
+    gen_and_save_adj(dataset_name="pems03")
+    gen_and_save_adj(dataset_name="pems04")
+    gen_and_save_adj(dataset_name="pems07")
+    gen_and_save_adj(dataset_name="pems08")
