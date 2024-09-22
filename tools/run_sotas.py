@@ -54,7 +54,7 @@ def main():
             cmd = "python -m tools.main model=DCRNN data=pems03 trainer/lr_skd=multistep\
                 'trainer.lr_skd.milestones=[80]' trainer.lr_skd.gamma=0.3 trainer.optimizer.lr=0.003\
                 trainer.optimizer.eps=1e-3 trainer.optimizer.weight_decay=0 +trainer.optimizer.amsgrad=True\
-                data.dp.priori_gs.type=dual_random_walk trainer.dataloader.batch_size=32"
+                data.dp.priori_gs.type=dual_random_walk trainer.dataloader.batch_size=32 data.dp.scaling=minmax"
         elif data == "pems04":
             cmd = "python -m tools.main model=DCRNN data=pems04 trainer/lr_skd=multistep\
                 'trainer.lr_skd.milestones=[80]' trainer.lr_skd.gamma=0.3 trainer.optimizer.lr=0.003\
@@ -216,32 +216,33 @@ def main():
     elif model == "GMAN":
         if data == "metr_la":
             cmd = "python -m tools.main model=GMAN data=metr_la trainer/lr_skd=multistep trainer.es.patience=10\
-                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
+                'trainer.lr_skd.milestones=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50]' trainer.lr_skd.gamma=0.7\
                 trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=16\
                 'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/metr_la/SE_metr_la.txt]'"
         elif data == "pems_bay":
             cmd = "python -m tools.main model=GMAN data=pems_bay trainer/lr_skd=multistep trainer.es.patience=10\
-                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
-                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=8\
+                trainer.optimizer.lr=0.0005 'trainer.lr_skd.milestones=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50]'\
+                trainer.lr_skd.gamma=0.7 trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True\
+                trainer.dataloader.batch_size=16\
                 'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems_bay/SE_pems_bay.txt]'"
         elif data == "pems03":
             cmd = "python -m tools.main model=GMAN data=pems03 trainer/lr_skd=multistep trainer.es.patience=10\
-                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
-                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=8\
+                'trainer.lr_skd.milestones=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50]' trainer.lr_skd.gamma=0.7\
+                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=16\
                 'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems03/SE_pems03.txt]'"
         elif data == "pems04":
             cmd = "python -m tools.main model=GMAN data=pems04 trainer/lr_skd=multistep trainer.es.patience=10\
-                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
-                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=8\
+                'trainer.lr_skd.milestones=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50]' trainer.lr_skd.gamma=0.7\
+                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=16\
                 'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems04/SE_pems04.txt]'"
         elif data == "pems07":
             cmd = "python -m tools.main model=GMAN data=pems07 trainer/lr_skd=multistep trainer.es.patience=10\
-                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
-                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=8\
+                'trainer.lr_skd.milestones=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50]' trainer.lr_skd.gamma=0.7\
+                trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=16\
                 'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems07/SE_pems07.txt]'"
         elif data == "pems08":
             cmd = "python -m tools.main model=GMAN data=pems08 trainer/lr_skd=multistep trainer.es.patience=10\
-                'trainer.lr_skd.milestones=[10, 20, 30, 40, 50]' trainer.lr_skd.gamma=0.9\
+                'trainer.lr_skd.milestones=[5, 10, 15, 20, 25, 30, 35, 40, 45, 50]' trainer.lr_skd.gamma=0.7\
                 trainer.optimizer.weight_decay=0 data.dp.time_enc.add_diw=True trainer.dataloader.batch_size=16\
                 'data.dp.aux_data_path=[${paths.RAW_DATA_PATH}/pems08/SE_pems08.txt]'"
     elif model == "GTS":
@@ -307,7 +308,8 @@ def main():
         elif data == "pems03":
             cmd = "python -m tools.main model=STID data=pems03 trainer/lr_skd=multistep trainer.epochs=200\
                 'trainer.lr_skd.milestones=[1, 50, 80]' trainer.lr_skd.gamma=0.5 trainer.optimizer.lr=0.002\
-                trainer.dataloader.batch_size=32 data.dp.time_enc.add_diw=True model.model_params.n_series=358"
+                trainer.dataloader.batch_size=32 data.dp.time_enc.add_diw=True model.model_params.n_series=358\
+                data.dp.scaling=null trainer.rescale=False"
         elif data == "pems04":
             cmd = "python -m tools.main model=STID data=pems04 trainer/lr_skd=multistep trainer.epochs=200\
                 'trainer.lr_skd.milestones=[1, 50, 80]' trainer.lr_skd.gamma=0.5 trainer.optimizer.lr=0.002\
