@@ -130,6 +130,9 @@ class DataProcessor(object):
         scaler = None
         if self.scaling is not None:
             data_tr, data_val, scaler = self._scale(data_tr, data_val)
+        elif self._data_holdout is not None:
+            # holdout test set
+            self._data_test = self._data_holdout.copy()
 
         logging.info("Done.")
 

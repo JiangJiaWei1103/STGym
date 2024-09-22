@@ -152,7 +152,7 @@ def calculate_scaled_laplacian(adj_mx: np.ndarray, lambda_max: int = 2, undirect
         adj_mx = np.maximum.reduce([adj_mx, adj_mx.T])
     L = calculate_normalized_laplacian(adj_mx)
     if lambda_max is None:
-        lambda_max, _ = linalg.eigsh(L, 1, which="LM")
+        lambda_max, _ = linalg.eigsh(L, 1, which="LM", maxiter=10000)
         lambda_max = lambda_max[0]  # type: ignore
     L = sp.csr_matrix(L)
     M, _ = L.shape
